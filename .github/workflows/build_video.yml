@@ -29,10 +29,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Blender, FFmpeg & Python Tools
+      - name: Install Blender, FFmpeg & Graphics Libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender ffmpeg
+          sudo apt-get install -y blender ffmpeg xvfb libegl1 libgl1 libglx-mesa0 libxkbcommon0 libxi6 libxrender1
           pip install edge-tts cloudinary requests
 
       - name: Run 3D Render & 5-Min Auto-Cleanup
@@ -44,4 +44,4 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-        run: python engine/make_movie.py
+        run: xvfb-run -a python engine/make_movie.py
