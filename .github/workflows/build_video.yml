@@ -1,0 +1,47 @@
+name: 3D Movie Render Engine
+
+on:
+  repository_dispatch:
+    types: [render-3d-video]
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Unique Job ID'
+        required: true
+        default: 'test_001'
+      narration:
+        description: 'Voiceover Script'
+        required: true
+        default: 'Welcome to our 3D AI studio. Everything here is generated automatically.'
+      blender_code:
+        description: 'Blender Python Script'
+        required: false
+        default: ''
+      webhook_url:
+        description: 'MCP Server Callback URL'
+        required: false
+        default: ''
+
+jobs:
+  render-movie:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender, FFmpeg & Python Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender ffmpeg
+          pip install edge-tts cloudinary requests
+
+      - name: Run 3D Render & 5-Min Auto-Cleanup
+        env:
+          JOB_ID: ${{ github.event.client_payload.job_id || github.event.inputs.job_id }}
+          NARRATION: ${{ github.event.client_payload.narration || github.event.inputs.narration }}
+          BLENDER_CODE: ${{ github.event.client_payload.blender_code || github.event.inputs.blender_code }}
+          WEBHOOK_URL: ${{ github.event.client_payload.webhook_url || github.event.inputs.webhook_url }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+        run: python engine/make_movie.py
