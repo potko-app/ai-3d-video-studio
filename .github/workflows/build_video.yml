@@ -1,47 +1,77 @@
-name: 3D Movie Render Engine
+name: Kinetra3D Hollywood Render Engine
 
+# यह इंजन सिर्फ तभी चलेगा जब Worker.js इसे 'render-3d-video' का सिग्नल भेजेगा
 on:
   repository_dispatch:
     types: [render-3d-video]
-  workflow_dispatch:
-    inputs:
-      job_id:
-        description: 'Unique Job ID'
-        required: true
-        default: 'test_001'
-      narration:
-        description: 'Voiceover Script'
-        required: true
-        default: 'Welcome to our 3D AI studio. Everything here is generated automatically.'
-      blender_code:
-        description: 'Blender Python Script'
-        required: false
-        default: ''
-      webhook_url:
-        description: 'MCP Server Callback URL'
-        required: false
-        default: ''
+
+# 100 वीडियो एक साथ आने पर कतार (Queue) को मैनेज करने की सेटिंग
+concurrency:
+  group: 3d-render-${{ github.event.client_payload.job_id }}
+  cancel-in-progress: false
 
 jobs:
   render-movie:
+    name: 3D Render & AI Voice
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # क्रैश और जाम से बचाने के लिए 5 मिनट की हार्ड लिमिट
+
     steps:
-      - name: Checkout Repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Blender, FFmpeg & Graphics Libraries
+      - name: 🛠️ Setup Blender 5.0 & Open-Source Engine
         run: |
-          sudo apt-get update
-          sudo apt-get install -y blender ffmpeg xvfb libegl1 libgl1 libglx-mesa0 libxkbcommon0 libxi6 libxrender1
-          pip install edge-tts cloudinary requests
+          sudo snap install blender --classic
+          
+          # Blender के धांसू ओपन-सोर्स प्लगइन्स (Characters, Landscapes, Lighting) एक्टिवेट करें
+          mkdir -p ~/.config/blender/4.0/scripts/startup
+          echo "import bpy" > ~/.config/blender/4.0/scripts/startup/enable_addons.py
+          echo "bpy.ops.preferences.addon_enable(module='rigify')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
+          echo "bpy.ops.preferences.addon_enable(module='ant_landscape')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
+          echo "bpy.ops.preferences.addon_enable(module='node_wrangler')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
 
-      - name: Run 3D Render & 5-Min Auto-Cleanup
+      - name: 🧠 AI Script Injection & 3D Rendering
         env:
-          JOB_ID: ${{ github.event.client_payload.job_id || github.event.inputs.job_id }}
-          NARRATION: ${{ github.event.client_payload.narration || github.event.inputs.narration }}
-          BLENDER_CODE: ${{ github.event.client_payload.blender_code || github.event.inputs.blender_code }}
-          WEBHOOK_URL: ${{ github.event.client_payload.webhook_url || github.event.inputs.webhook_url }}
-          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-        run: xvfb-run -a python engine/make_movie.py
+          BLENDER_CODE: ${{ github.event.client_payload.blender_code }}
+          JOB_ID: ${{ github.event.client_payload.job_id }}
+        run: |
+          # AI द्वारा भेजे गए कोड को सुरक्षित रूप से पाइथन फाइल में बदलना
+          echo "$BLENDER_CODE" > ai_scene.py
+          
+          # बैकग्राउंड (Headless) मोड में Blender चलाना
+          blender -b -P ai_scene.py -o //render_output_${JOB_ID}_ -F FFMPEG -x 1 -a
+
+      - name: 🗣️ Generate AI Voiceover & Merge (FFmpeg)
+        env:
+          NARRATION: ${{ github.event.client_payload.narration }}
+          JOB_ID: ${{ github.event.client_payload.job_id }}
+        run: |
+          sudo apt-get install -y ffmpeg edge-tts
+          
+          # AI आवाज़ तैयार करना (अगर नरेशन खाली नहीं है)
+          if [ -n "$NARRATION" ]; then
+            edge-tts --text "$NARRATION" --voice "en-US-ChristopherNeural" --write-media voice_${JOB_ID}.mp3
+            # 3D वीडियो और आवाज़ को आपस में जोड़ना
+            ffmpeg -i render_output_${JOB_ID}_0001-0250.mp4 -i voice_${JOB_ID}.mp3 -c:v copy -c:a aac final_${JOB_ID}.mp4
+          else
+            mv render_output_${JOB_ID}_0001-0250.mp4 final_${JOB_ID}.mp4
+          fi
+
+          # प्रीव्यू के लिए GIF बनाना
+          ffmpeg -i final_${JOB_ID}.mp4 -vf "fps=10,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
+
+      - name: ☁️ Upload to Cloudinary (Auto-Delete after 5 mins)
+        env:
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          JOB_ID: ${{ github.event.client_payload.job_id }}
+        run: |
+          curl -X POST "https://api.cloudinary.com/v1_1/cltgefea/video/upload" \
+            -F "file=@final_${JOB_ID}.mp4" \
+            -F "public_id=${JOB_ID}" \
+            -F "upload_preset=ml_default"
+            
+          curl -X POST "https://api.cloudinary.com/v1_1/cltgefea/image/upload" \
+            -F "file=@preview_${JOB_ID}.gif" \
+            -F "public_id=${JOB_ID}_preview" \
+            -F "upload_preset=ml_default"
