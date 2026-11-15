@@ -12,7 +12,7 @@ jobs:
   render-movie:
     name: 3D Render & AI Voice
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10 # टाइमआउट बढ़ाकर 10 मिनट किया गया
 
     steps:
       - name: 📥 Checkout Repository
@@ -20,28 +20,36 @@ jobs:
 
       - name: 🛠️ Setup Blender 5.0, EGL Graphics & Open-Source Engine
         run: |
-          # 1. ग्राफ़िक्स की मिसिंग EGL लाइब्रेरीज़ और वर्चुअल डिस्प्ले (xvfb) इंस्टॉल करें
           sudo apt-get update
           sudo apt-get install -y libegl1 libgl1 libglx-mesa0 xvfb libxkbcommon-x11-0 libsm6 libxext6 libxrender-dev
-          
-          # 2. Blender इंस्टॉल करें
           sudo snap install blender --classic
           
-          # 3. Blender के धांसू ओपन-सोर्स प्लगइन्स एक्टिवेट करें
           mkdir -p ~/.config/blender/4.0/scripts/startup
           echo "import bpy" > ~/.config/blender/4.0/scripts/startup/enable_addons.py
           echo "bpy.ops.preferences.addon_enable(module='rigify')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
           echo "bpy.ops.preferences.addon_enable(module='ant_landscape')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
           echo "bpy.ops.preferences.addon_enable(module='node_wrangler')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
 
-      - name: 🧠 AI Script Injection & 3D Rendering
+      - name: 🧠 AI Script Injection & Fast CPU 3D Rendering
         env:
           BLENDER_CODE: ${{ github.event.client_payload.blender_code }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
         run: |
+          # AI कोड में ऑटोमैटिक स्पीड बूस्टर जोड़ना (सैम्पल्स को 8 करना ताकि CPU पर लोड न पड़े)
+          cat << 'EOF' > speed_patch.py
+          import bpy
+          for scene in bpy.data.scenes:
+              scene.render.engine = 'BLENDER_EEVEE_NEXT'
+              scene.eevee.taa_samples = 8  # सुपर-फास्ट स्पीड के लिए सैम्पल्स 8 किए गए
+              scene.render.resolution_x = 1280
+              scene.render.resolution_y = 720
+          EOF
+
           echo "$BLENDER_CODE" > ai_scene.py
           
-          # xvfb-run का इस्तेमाल करके वर्चुअल स्क्रीन पर Blender चलाएं (ताकि क्रैश न हो)
+          # पैच और यूजर कोड को मिलाकर चलाना
+          cat speed_patch.py >> ai_scene.py
+
           xvfb-run -a blender -b -P ai_scene.py -o //render_output_${JOB_ID}_ -F FFMPEG -x 1 -a
 
       - name: 🗣️ Generate AI Voiceover & Merge (FFmpeg)
@@ -58,7 +66,7 @@ jobs:
             mv render_output_${JOB_ID}_0001-0250.mp4 final_${JOB_ID}.mp4
           fi
 
-          ffmpeg -i final_${JOB_ID}.mp4 -vf "fps=10,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
+          ffmpeg -i final_${JOB_ID}.mp4 -vf "fps=15,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
 
       - name: ☁️ Upload to Cloudinary (Auto-Delete after 5 mins)
         env:
