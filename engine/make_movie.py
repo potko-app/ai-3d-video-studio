@@ -14,12 +14,12 @@ cloudinary.config(
     api_secret=os.environ["CLOUDINARY_API_SECRET"]
 )
 
-job_id = os.environ.get("JOB_ID", "demo_job")
-narration = os.environ.get("NARRATION", "This is a 3D animated scene.")
+job_id = os.environ.get("JOB_ID", "fast_test_01")
+narration = os.environ.get("NARRATION", "Welcome to our ultra fast 3D AI studio.")
 custom_blender_code = os.environ.get("BLENDER_CODE", "").strip()
 webhook_url = os.environ.get("WEBHOOK_URL", "").strip()
 
-# 2. AUTO-CLEANUP: 5 Minute (300 sec) se purane saare videos permanent delete karein
+# 2. AUTO-CLEANUP: 5 Minute (300 sec) se purane videos delete karein
 def cleanup_old_videos():
     try:
         resources = cloudinary.api.resources(
@@ -40,7 +40,7 @@ def cleanup_old_videos():
 
 cleanup_old_videos()
 
-# 3. Voiceover Generate karein (Edge-TTS - 100% Free)
+# 3. Voiceover Generate karein (Edge-TTS)
 subprocess.run([
     "edge-tts",
     "--voice", "en-US-ChristopherNeural",
@@ -48,17 +48,34 @@ subprocess.run([
     "--write-media", "voice.mp3"
 ], check=True)
 
-# Audio ki length nikalna taaki 3D video utna hi lamba bane
 duration_cmd = subprocess.check_output([
     "ffprobe", "-v", "error", "-show_entries", "format=duration",
     "-of", "default=noprint_wrappers=1:nokey=1", "voice.mp3"
 ]).decode().strip()
 audio_seconds = max(5, int(float(duration_cmd)) + 1)
-total_frames = audio_seconds * 24
+fps = 20
+total_frames = audio_seconds * fps
 
 os.makedirs("frames", exist_ok=True)
 
-# 4. Blender 5.0 Compatible Python Script
+# 4. TURBO CPU SPEED OPTIMIZER (1-2 Minute Render Guarantee)
+speed_optimizer = """
+import bpy
+scene = bpy.context.scene
+scene.render.resolution_x = 960
+scene.render.resolution_y = 540
+try:
+    scene.eevee.taa_render_samples = 4
+    scene.eevee.use_raytracing = False
+    scene.eevee.use_shadows = False
+except Exception:
+    pass
+scene.render.image_settings.file_format = 'JPEG'
+scene.render.image_settings.quality = 88
+scene.render.filepath = 'frames/frame_'
+"""
+
+# Default Colorful Test Scene (Blender 5.0 Principled BSDF + World Light)
 default_scene = f"""
 import bpy
 import math
@@ -66,59 +83,75 @@ import math
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 
-# Render Engine (Blender 4 & 5 compatible)
-for eng in ['BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH']:
+for eng in ['BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE']:
     try:
         scene.render.engine = eng
         break
     except Exception:
         pass
 
-scene.render.resolution_x = 1280
-scene.render.resolution_y = 720
-scene.render.fps = 24
+scene.render.fps = {fps}
 scene.frame_start = 1
 scene.frame_end = {total_frames}
 
-# Camera & Lighting
-bpy.ops.object.camera_add(location=(0, -8, 3), rotation=(math.radians(75), 0, 0))
+# Bright Studio World Background
+world = bpy.data.worlds.new("StudioWorld")
+scene.world = world
+world.use_nodes = True
+bg = world.node_tree.nodes.get("Background")
+if bg:
+    bg.inputs[0].default_value = (0.08, 0.14, 0.25, 1.0)
+    bg.inputs[1].default_value = 1.2
+
+# Camera & Lights
+bpy.ops.object.camera_add(location=(0, -7, 2.5), rotation=(math.radians(75), 0, 0))
 scene.camera = bpy.context.object
 
 bpy.ops.object.light_add(type='SUN', location=(4, -4, 8))
-bpy.ops.object.light_add(type='AREA', location=(-4, -3, 5))
-bpy.context.object.data.energy = 150.0
+bpy.context.object.data.energy = 3.0
 
-# 3D Animated Subject
-bpy.ops.mesh.primitive_monkey_add(size=2, location=(0, 0, 1))
+# Colorful 3D Subject (Blender 5.0 Shader)
+bpy.ops.mesh.primitive_monkey_add(size=2.2, location=(0, 0, 0.5))
 obj = bpy.context.object
 bpy.ops.object.shade_smooth()
 
-mat = bpy.data.materials.new(name="HeroMat")
-mat.diffuse_color = (0.1, 0.6, 0.9, 1.0)
+mat = bpy.data.materials.new(name="BrightGoldMat")
+mat.use_nodes = True
+bsdf = mat.node_tree.nodes.get("Principled BSDF")
+if bsdf:
+    bsdf.inputs["Base Color"].default_value = (1.0, 0.65, 0.05, 1.0)
+    bsdf.inputs["Metallic"].default_value = 0.4
+    bsdf.inputs["Roughness"].default_value = 0.25
 obj.data.materials.append(mat)
 
-# Keyframe Animation
 obj.rotation_euler = (0, 0, 0)
 obj.keyframe_insert(data_path="rotation_euler", frame=1)
 obj.rotation_euler = (0, 0, math.radians(360))
 obj.keyframe_insert(data_path="rotation_euler", frame={total_frames})
 
-# PNG Frames render karein
-scene.render.image_settings.file_format = 'PNG'
-scene.render.filepath = 'frames/frame_'
+{speed_optimizer}
 bpy.ops.render.render(animation=True)
 """
 
-script_to_run = custom_blender_code if custom_blender_code else default_scene
+if custom_blender_code:
+    if "bpy.ops.render.render" in custom_blender_code:
+        script_to_run = custom_blender_code.replace(
+            "bpy.ops.render.render",
+            speed_optimizer + "\nbpy.ops.render.render"
+        )
+    else:
+        script_to_run = custom_blender_code + "\n" + speed_optimizer + "\nbpy.ops.render.render(animation=True)"
+else:
+    script_to_run = default_scene
+
 with open("scene_script.py", "w") as f:
     f.write(script_to_run)
 
-# Headless Blender chalakar 3D frames render karein
 subprocess.run(["blender", "-b", "-P", "scene_script.py"], check=True)
 
-# 5. FFmpeg se PNG Frames + Voiceover jodkar HD MP4 aur Preview GIF banayein
+# 5. FFmpeg se HD MP4 aur Preview GIF banayein
 subprocess.run([
-    "ffmpeg", "-y", "-framerate", "24", "-i", "frames/frame_%04d.png",
+    "ffmpeg", "-y", "-framerate", str(fps), "-i", "frames/frame_%04d.jpg",
     "-i", "voice.mp3", "-c:v", "libx264", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-shortest", "final_movie.mp4"
 ], check=True)
@@ -144,7 +177,6 @@ gif_res = cloudinary.uploader.upload(
 created_timestamp = int(time.time())
 print("RENDER_COMPLETE:", video_res["secure_url"])
 
-# 7. MCP Server ko batayein ki video taiyar hai
 if webhook_url:
     requests.post(webhook_url, json={
         "job_id": job_id,
