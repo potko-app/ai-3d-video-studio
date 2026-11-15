@@ -6,15 +6,14 @@
   <title>Kinetra3D — Pro Cloud 3D Video Studio</title>
   <style>
     :root {
-      --bg: #0A0A0C;
-      --card: #121216;
-      --border: #22222B;
+      --bg: #09090B;
+      --card: #131316;
+      --border: #27272A;
       --accent: #6366F1;
-      --accent-hover: #4F46E5;
-      --text: #F4F4F5;
-      --muted: #A1A1AA;
+      --accent-glow: rgba(99, 102, 241, 0.4);
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
       --success: #10B981;
-      --danger: #EF4444;
     }
 
     * {
@@ -24,367 +23,248 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    html, body {
-      width: 100%;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
       overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
     }
 
-    /* Animated Glow Background Accent */
+    /* Ambient Background Glow */
     body::before {
       content: '';
       position: fixed;
-      top: -50%;
+      top: -20%;
       left: 50%;
       transform: translateX(-50%);
-      width: 600px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(10,10,12,0) 70%);
-      z-index: 0;
+      width: 80vw;
+      height: 50vh;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+      z-index: -1;
+      filter: blur(80px);
       pointer-events: none;
     }
 
-    .wrapper {
-      position: relative;
-      z-index: 1;
+    .container {
       width: 100%;
-      max-width: 680px;
+      max-width: 700px;
       margin: 0 auto;
       padding: 16px;
     }
 
-    /* Header */
-    .header {
-      width: 100%;
-      padding: 12px 0;
+    /* Navbar */
+    .navbar {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
+      align-items: center;
+      padding: 16px 0 32px 0;
     }
 
-    .brand {
+    .logo {
       display: flex;
       align-items: center;
       gap: 10px;
-      text-decoration: none;
-      color: var(--text);
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 800;
+      color: var(--text-main);
+      text-decoration: none;
       letter-spacing: -0.5px;
     }
 
-    .brand-logo {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+    .logo-icon {
       background: linear-gradient(135deg, #6366F1, #8B5CF6);
-      color: #FFFFFF;
-      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 900;
-      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+      box-shadow: 0 4px 15px var(--accent-glow);
     }
 
-    .status-badge {
-      display: inline-flex;
+    .status-pill {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      padding: 6px 14px;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 12px;
-      border-radius: 999px;
-      background: rgba(16,185,129,0.1);
-      border: 1px solid rgba(16,185,129,0.2);
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--success);
     }
 
-    .status-dot {
+    .status-pill .dot {
       width: 6px;
       height: 6px;
-      border-radius: 50%;
       background: var(--success);
+      border-radius: 50%;
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      50% { transform: scale(1.2); opacity: 1; }
-      100% { transform: scale(0.95); opacity: 0.8; }
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* Ad Banner Slot (AdSense / Monetag Compliant Layout) */
-    .ad-slot {
-      width: 100%;
-      min-height: 74px;
-      background: var(--card);
-      border: 1px dashed var(--border);
-      border-radius: 12px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .ad-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-
-    .ad-text {
-      font-size: 11.5px;
-      color: #71717A;
-    }
-
-    /* Hero Section */
+    /* Hero */
     .hero {
       text-align: center;
-      padding: 10px 0 24px 0;
-    }
-
-    .hero-tag {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      color: #818CF8;
-      background: rgba(99,102,241,0.1);
-      border: 1px solid rgba(99,102,241,0.2);
-      padding: 5px 12px;
-      border-radius: 999px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      margin-bottom: 32px;
     }
 
     .hero h1 {
-      font-size: 30px;
+      font-size: 32px;
       font-weight: 900;
       letter-spacing: -1px;
-      line-height: 1.15;
-      margin-bottom: 10px;
-      background: linear-gradient(180deg, #FFFFFF 0%, #A1A1AA 100%);
+      margin-bottom: 12px;
+      background: linear-gradient(to right, #FFFFFF, #94A3B8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
     .hero p {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.5;
+      font-size: 15px;
+      color: var(--text-muted);
     }
 
-    /* SaaS Micro Cards */
+    /* Cards */
     .card {
-      width: 100%;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 18px;
+      padding: 20px;
       margin-bottom: 20px;
-      transition: border-color 0.2s ease;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
 
-    .card:hover {
-      border-color: rgba(99,102,241,0.4);
-    }
-
-    .card-title {
-      font-size: 13px;
+    .card-header {
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      margin-bottom: 10px;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
     }
 
-    .mcp-box {
-      width: 100%;
-      background: #0A0A0C;
+    .mcp-link-box {
+      background: #000000;
       border: 1px solid var(--border);
+      padding: 14px;
       border-radius: 10px;
-      padding: 12px 14px;
-      font-family: ui-monospace, monospace;
-      font-size: 12px;
-      color: #E4E4E7;
-      word-break: break-all;
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--text-main);
       margin-bottom: 12px;
+      word-break: break-all;
     }
 
     /* Buttons */
     .btn {
-      appearance: none;
-      border: none;
-      outline: none;
       width: 100%;
       padding: 14px;
-      border-radius: 12px;
-      font-size: 14.5px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      transition: all 0.2s;
       text-decoration: none;
-      transition: all 0.2s ease;
     }
 
-    .btn-accent {
+    .btn-primary {
       background: linear-gradient(135deg, #6366F1, #4F46E5);
-      color: #FFFFFF;
-      box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+      color: white;
+      box-shadow: 0 4px 15px var(--accent-glow);
     }
 
-    .btn-accent:active {
-      transform: scale(0.98);
-    }
+    .btn-primary:active { transform: scale(0.98); }
 
     .btn-secondary {
-      background: #1E1E26;
-      color: var(--text);
+      background: #1E1E24;
+      color: var(--text-main);
       border: 1px solid var(--border);
     }
 
-    .disabled {
-      opacity: 0.4;
-      pointer-events: none;
-    }
+    .btn-secondary:active { background: #27272A; }
 
-    /* Interactive Studio Controls */
-    .input-field {
+    .disabled { opacity: 0.5; pointer-events: none; }
+
+    /* Interactive Prompt Builder Options */
+    .input-box {
       width: 100%;
-      background: #0A0A0C;
+      background: #000000;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      color: white;
       padding: 14px;
-      color: var(--text);
+      border-radius: 10px;
       font-family: inherit;
       font-size: 14px;
-      outline: none;
       resize: none;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
+    .input-box:focus { outline: 1px solid var(--accent); }
 
-    .input-field:focus {
-      border-color: var(--accent);
-    }
-
-    .label-mini {
+    .label-small {
       font-size: 11px;
       font-weight: 700;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: var(--muted);
       margin-bottom: 8px;
       display: block;
     }
 
-    .options-grid {
+    .chip-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
+    .chip-grid.two-col { grid-template-columns: repeat(2, 1fr); }
 
-    .opt-chip {
-      background: #0A0A0C;
+    .chip {
+      background: #000000;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 8px;
+      padding: 10px 4px;
+      border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
+      color: var(--text-muted);
       text-align: center;
-      transition: all 0.15s ease;
-    }
-
-    .opt-chip.active {
-      background: rgba(99,102,241,0.15);
-      border-color: var(--accent);
-      color: var(--text);
-    }
-
-    .preview-box {
-      background: #0A0A0C;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      font-size: 12.5px;
-      color: #E4E4E7;
-      line-height: 1.5;
-      margin-bottom: 14px;
-    }
-
-    /* Tabs */
-    .tab-row {
-      display: flex;
-      background: #0A0A0C;
-      padding: 4px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      margin-bottom: 14px;
-    }
-
-    .tab-item {
-      flex: 1;
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 700;
-      padding: 10px;
-      border-radius: 8px;
       cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: var(--accent);
+      color: white;
     }
 
-    .tab-item.active {
-      background: var(--card);
-      color: var(--text);
+    .prompt-output {
+      background: #000000;
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #E2E8F0;
+      line-height: 1.5;
+      margin-bottom: 16px;
     }
 
-    .guide-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 12px;
-      font-size: 13.5px;
-      color: #D4D4D8;
-    }
-
-    .step-badge {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      border-radius: 50%;
-      background: rgba(99,102,241,0.15);
-      color: #818CF8;
-      font-size: 11px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Video Player Face (Edge-to-Edge) */
-    .media-container {
+    /* Video Player Face */
+    .video-stage {
       width: 100vw;
       margin-left: calc(-50vw + 50%);
       aspect-ratio: 16 / 9;
@@ -393,9 +273,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      border-bottom: 1px solid var(--border);
     }
 
-    .media-container video {
+    .video-stage video {
       width: 100%;
       height: 100%;
       object-fit: contain;
@@ -403,430 +284,255 @@
     }
 
     .render-hud {
-      padding: 24px;
       text-align: center;
+      padding: 20px;
     }
 
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
+    .loader-ring {
+      width: 40px;
+      height: 40px;
       border: 3px solid rgba(255,255,255,0.1);
       border-top-color: var(--accent);
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 12px auto;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px auto;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
 
-    .hud-title {
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
+    .hud-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .hud-sub { font-size: 13px; color: var(--text-muted); }
 
-    .hud-sub {
-      font-size: 12.5px;
-      color: var(--muted);
-    }
-
-    .progress-bar-wrap {
+    .progress-track {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 3px;
+      bottom: 0; left: 0; width: 100%; height: 3px;
       background: rgba(255,255,255,0.1);
     }
-
-    .progress-bar-fill {
-      height: 100%;
-      width: 15%;
+    .progress-fill {
+      height: 100%; width: 15%;
       background: var(--accent);
-      transition: width 0.5s ease;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 10px var(--accent);
     }
 
-    /* Footer & Legal (AdSense / Monetag Policy Compliance) */
-    .footer {
-      width: 100%;
-      padding: 30px 0 40px 0;
-      text-align: center;
-      border-top: 1px solid var(--border);
-      margin-top: 30px;
-    }
-
-    .legal-links {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 12px;
-      font-size: 12px;
-    }
-
-    .legal-links a {
-      color: var(--muted);
-      text-decoration: none;
-    }
-
-    .legal-links a:hover {
-      color: var(--text);
-    }
-
-    .copyright {
-      font-size: 11.5px;
-      color: #71717A;
-    }
-
-    .hidden {
-      display: none !important;
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-  <div class="wrapper">
-    <!-- Top Header -->
-    <header class="header">
-      <a href="./" class="brand">
-        <span class="brand-logo">K3</span>
-        <span>Kinetra3D</span>
+  <div class="container">
+    <nav class="navbar">
+      <a href="./" class="logo">
+        <div class="logo-icon">K3</div>
+        Kinetra3D
       </a>
-      <div id="statusChip" class="status-badge">
-        <span class="status-dot"></span>
-        <span id="statusChipText">Engine Online</span>
+      <div id="topStatus" class="status-pill">
+        <div class="dot"></div> Engine Online
       </div>
-    </header>
+    </nav>
 
-    <!-- Top Ad Banner -->
-    <div class="ad-slot" id="topAd">
-      <span class="ad-label">Advertisement</span>
-      <span class="ad-text">Top AdSense / Monetag Banner Slot</span>
-    </div>
+    <!-- ================= FACE 1: PRO STUDIO HUB ================= -->
+    <main id="studioFace">
+      <div class="hero">
+        <h1>Cloud 3D Video Studio</h1>
+        <p>Connect Claude/ChatGPT via MCP to render full Hollywood-grade 3D animations with Voiceover in 120s.</p>
+      </div>
 
-    <!-- ==================== FACE 1: PRO STUDIO & HUB ==================== -->
-    <main id="studioHub">
-      <section class="hero">
-        <span class="hero-tag">Cloud Blender 5.0 + AI Voiceover</span>
-        <h1>Pro 3D Video Studio</h1>
-        <p>Connect via MCP and generate stunning 360° animated 3D videos with voiceover instantly.</p>
-      </section>
-
-      <!-- MCP Endpoint Card -->
       <div class="card">
-        <div class="card-title">
-          <span>MCP Server Endpoint</span>
-          <span style="color:var(--success);">Active</span>
+        <div class="card-header">
+          <span>1. MCP Server Link</span>
+          <span style="color: var(--success)">Active</span>
         </div>
-        <div class="mcp-box" id="mcpUrl">https://ai-3d-video-studio-mcp.kinetra3d.workers.dev/mcp</div>
-        <button type="button" class="btn btn-secondary" id="copyMcpBtn">Copy MCP URL</button>
+        <div class="mcp-link-box" id="mcpUrl">https://ai-3d-video-studio-mcp.kinetra3d.workers.dev/mcp</div>
+        <button class="btn btn-secondary" id="copyMcpBtn">Copy MCP Link</button>
       </div>
 
-      <!-- Interactive 360° Prompt Studio -->
       <div class="card">
-        <div class="card-title">360° Scene & Prompt Builder</div>
+        <div class="card-header">2. Interactive 360° Scene Builder</div>
         
-        <label class="label-mini">Topic / Story</label>
-        <textarea id="topicInput" class="input-field" rows="2" placeholder="Describe 3D scene...">How a black hole bends light from a nearby star</textarea>
+        <span class="label-small">Scene Description</span>
+        <textarea id="topicInput" class="input-box" rows="2" placeholder="e.g. A cyberpunk city with flying cars...">A futuristic robot walking in a glowing neon city</textarea>
 
-        <label class="label-mini">Camera Motion (360°)</label>
-        <div class="options-grid" id="camGrid">
-          <button type="button" class="opt-chip active" data-val="smooth 360-degree orbital camera">Orbital 360°</button>
-          <button type="button" class="opt-chip" data-val="dramatic macro zoom camera">Macro Zoom</button>
-          <button type="button" class="opt-chip" data-val="dynamic fly-through camera">Fly-Through</button>
+        <span class="label-small">Camera Angle</span>
+        <div class="chip-grid" id="camGrid">
+          <div class="chip active" data-val="dynamic 360-degree orbital camera">Orbital 360°</div>
+          <div class="chip" data-val="cinematic slow push-in zoom">Macro Zoom</div>
+          <div class="chip" data-val="fast fly-through tracking camera">Fly-Through</div>
         </div>
 
-        <label class="label-mini">Lighting & Style</label>
-        <div class="options-grid" id="lightGrid">
-          <button type="button" class="opt-chip active" data-val="cinematic dark volumetric lighting">Dark Volumetric</button>
-          <button type="button" class="opt-chip" data-val="bright clean studio lighting">Bright Studio</button>
-          <button type="button" class="opt-chip" data-val="cyberpunk neon rim lighting">Neon Cyber</button>
+        <span class="label-small">Lighting & Style</span>
+        <div class="chip-grid" id="lightGrid">
+          <div class="chip active" data-val="dark volumetric cinematic lighting">Cinematic Dark</div>
+          <div class="chip" data-val="clean bright studio lighting">Bright Studio</div>
+          <div class="chip" data-val="cyberpunk neon lighting">Neon Glow</div>
         </div>
 
-        <label class="label-mini">Voice Language</label>
-        <div class="options-grid" id="langGrid" style="grid-template-columns: repeat(2, 1fr);">
-          <button type="button" class="opt-chip active" data-val="English">English</button>
-          <button type="button" class="opt-chip" data-val="Hindi">Hindi</button>
+        <span class="label-small">Voiceover Language</span>
+        <div class="chip-grid two-col" id="langGrid">
+          <div class="chip active" data-val="English">English Voice</div>
+          <div class="chip" data-val="Hindi">Hindi Voice</div>
         </div>
 
-        <label class="label-mini">Generated Pro Prompt</label>
-        <div class="preview-box" id="previewBox"></div>
-
-        <button type="button" class="btn btn-accent" id="copyPromptBtn">Copy Studio Prompt</button>
-      </div>
-
-      <!-- Quick Connect Guide -->
-      <div class="card">
-        <div class="card-title">Integration Guide</div>
-        <div class="tab-row">
-          <button type="button" class="tab-item active" id="tabClaude">Claude App</button>
-          <button type="button" class="tab-item" id="tabChatgpt">ChatGPT</button>
-        </div>
-
-        <div id="guideClaude">
-          <div class="guide-step"><span class="step-badge">1</span><span>Open <b>Settings → Connectors → Add custom connector</b> in Claude.</span></div>
-          <div class="guide-step"><span class="step-badge">2</span><span>Name it <b>Kinetra3D</b>, paste the MCP URL above, and tap Add.</span></div>
-          <div class="guide-step"><span class="step-badge">3</span><span>Paste your Studio Prompt in chat to render your 3D video.</span></div>
-        </div>
-
-        <div id="guideChatgpt" class="hidden">
-          <div class="guide-step"><span class="step-badge">1</span><span>Open <b>Settings → Apps & Connectors</b> (Developer Mode).</span></div>
-          <div class="guide-step"><span class="step-badge">2</span><span>Add new custom MCP connector with the URL above (Auth: None).</span></div>
-          <div class="guide-step"><span class="step-badge">3</span><span>Enable Kinetra3D and send your 3D prompt in chat.</span></div>
-        </div>
+        <span class="label-small">Auto-Generated AI Prompt</span>
+        <div class="prompt-output" id="finalPrompt"></div>
+        <button class="btn btn-primary" id="copyPromptBtn">Copy Studio Prompt</button>
       </div>
     </main>
 
-    <!-- ==================== FACE 2: VIDEO PLAYER & DOWNLOAD ==================== -->
-    <main id="playerView" class="hidden">
-      <div class="media-container" id="mediaContainer">
+    <!-- ================= FACE 2: VIDEO PLAYER ================= -->
+    <main id="playerFace" class="hidden">
+      <div class="video-stage">
         <div id="renderHud" class="render-hud">
-          <div class="spinner"></div>
-          <div id="hudTitle" class="hud-title">Rendering 3D Scene...</div>
-          <div id="hudSub" class="hud-sub">Blender cloud engine is processing (~90s). Auto-plays when ready.</div>
+          <div class="loader-ring"></div>
+          <div id="hudTitle" class="hud-title">Booting 3D Engine...</div>
+          <div id="hudSub" class="hud-sub">Generating frames and audio (~120s)</div>
         </div>
-        <video id="videoEl" controls playsinline preload="metadata"></video>
-        <div class="progress-bar-wrap">
-          <div id="progressBar" class="progress-bar-fill"></div>
-        </div>
+        <video id="videoPlayer" controls playsinline preload="metadata"></video>
+        <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
       </div>
 
-      <div style="padding-top: 20px;">
-        <h1 id="playerHeading" style="font-size: 20px; font-weight: 800; margin-bottom: 6px;">3D Video Output</h1>
-        <p id="playerMeta" style="font-size: 13.5px; color: var(--muted); margin-bottom: 20px;">Waiting for cloud render completion...</p>
+      <div style="padding-top: 24px;">
+        <h2 id="videoTitle" style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">3D Render Output</h2>
+        <p id="videoSub" style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Waiting for cloud compilation...</p>
 
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <a id="downloadBtn" href="#" download class="btn btn-accent disabled">↓ Download MP4 (1080p)</a>
-          <div style="display: flex; gap: 10px;">
-            <button type="button" id="shareBtn" class="btn btn-secondary disabled" style="flex:1;">↗ Share Link</button>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <a id="downloadBtn" href="#" class="btn btn-primary disabled">↓ Download MP4 Video</a>
+          <div style="display: flex; gap: 12px;">
+            <button id="shareBtn" class="btn btn-secondary disabled" style="flex:1;">↗ Share Link</button>
             <a href="./" class="btn btn-secondary" style="flex:1;">+ Create New</a>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- Bottom Ad Banner -->
-    <div class="ad-slot" id="bottomAd" style="margin-top: 24px;">
-      <span class="ad-label">Advertisement</span>
-      <span class="ad-text">Bottom AdSense / Monetag Banner Slot</span>
-    </div>
-
-    <!-- AdSense & Monetag Compliant Legal Footer -->
-    <footer class="footer">
-      <div class="legal-links">
-        <a href="#" onclick="alert('Kinetra3D uses secure cloud runners. We do not store personal data or videos past their 5-minute lifecycle.'); return false;">Privacy Policy</a>
-        <a href="#" onclick="alert('Free open-source 3D video generation service provided as-is.'); return false;">Terms of Service</a>
-        <a href="#" onclick="alert('Support / Contact: admin@kinetra3d.pages.dev'); return false;">Contact</a>
-      </div>
-      <div class="copyright">© 2026 Kinetra3D Studio. All rights reserved.</div>
-    </footer>
   </div>
 
   <script>
     const CLOUD = "cltgefea";
-    const STATUS_API = "https://ai-3d-video-studio-mcp.kinetra3d.workers.dev/status";
-
+    const API = "https://ai-3d-video-studio-mcp.kinetra3d.workers.dev/status";
+    
     const params = new URLSearchParams(window.location.search);
-    const shortId = params.get("v") || "";
-    const legacyVideo = params.get("video") || "";
-    const statusEP = params.get("status") || STATUS_API;
+    const vidId = params.get("v") || "";
+    
+    // Copy Utility
+    async function copyToClip(text, btn, originalText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "✓ Copied!";
+        setTimeout(() => btn.textContent = originalText, 2000);
+      } catch(e) {}
+    }
 
-    const studioHub = document.getElementById("studioHub");
-    const playerView = document.getElementById("playerView");
-    const statusChipText = document.getElementById("statusChipText");
+    if (!vidId) {
+      // --- STUDIO MODE ---
+      document.getElementById("mcpUrl").textContent = API.replace('/status', '/mcp');
+      document.getElementById("copyMcpBtn").onclick = function() {
+        copyToClip(document.getElementById("mcpUrl").textContent, this, "Copy MCP Link");
+      };
 
-    if (!shortId && !legacyVideo) {
-      // HUB MODE
-      studioHub.classList.remove("hidden");
-
-      const copyMcpBtn = document.getElementById("copyMcpBtn");
-      const mcpUrl = document.getElementById("mcpUrl").textContent.trim();
-      copyMcpBtn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(mcpUrl);
-          copyMcpBtn.textContent = "✓ MCP URL Copied!";
-          setTimeout(() => { copyMcpBtn.textContent = "Copy MCP URL"; }, 2000);
-        } catch (e) {}
-      });
-
-      // Prompt Builder State
-      let selCam = "smooth 360-degree orbital camera";
-      let selLight = "cinematic dark volumetric lighting";
-      let selLang = "English";
+      let cam = "dynamic 360-degree orbital camera";
+      let light = "dark volumetric cinematic lighting";
+      let lang = "English";
 
       const topicInput = document.getElementById("topicInput");
-      const previewBox = document.getElementById("previewBox");
-      const copyPromptBtn = document.getElementById("copyPromptBtn");
+      const finalPrompt = document.getElementById("finalPrompt");
 
-      function updateBuilder() {
-        const t = topicInput.value.trim() || "How a black hole bends light";
-        previewBox.textContent = `Use Kinetra3D Studio to render a fully animated 3D video about "${t}". Utilize a ${selCam}, ${selLight}, and provide clear voiceover narration in ${selLang}.`;
+      function updatePrompt() {
+        const t = topicInput.value.trim() || "A futuristic robot";
+        finalPrompt.textContent = `Use Kinetra3D to render a Hollywood-grade 3D movie about "${t}". Apply a ${cam}, ${light}, and generate a matching ${lang} voiceover narration. Rig characters and animate movements if needed.`;
       }
 
-      function setupChips(containerId, setter) {
-        const wrap = document.getElementById(containerId);
-        wrap.querySelectorAll(".opt-chip").forEach(btn => {
-          btn.addEventListener("click", () => {
-            wrap.querySelectorAll(".opt-chip").forEach(c => c.classList.remove("active"));
+      function setupChips(gridId, setter) {
+        const grid = document.getElementById(gridId);
+        grid.querySelectorAll(".chip").forEach(btn => {
+          btn.onclick = () => {
+            grid.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
             btn.classList.add("active");
             setter(btn.getAttribute("data-val"));
-            updateBuilder();
-          });
+            updatePrompt();
+          }
         });
       }
 
-      setupChips("camGrid", v => { selCam = v; });
-      setupChips("lightGrid", v => { selLight = v; });
-      setupChips("langGrid", v => { selLang = v; });
-      topicInput.addEventListener("input", updateBuilder);
-      updateBuilder();
+      setupChips("camGrid", v => cam = v);
+      setupChips("lightGrid", v => light = v);
+      setupChips("langGrid", v => lang = v);
+      topicInput.oninput = updatePrompt;
+      updatePrompt();
 
-      copyPromptBtn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(previewBox.textContent);
-          copyPromptBtn.textContent = "✓ Studio Prompt Copied!";
-          setTimeout(() => { copyPromptBtn.textContent = "Copy Studio Prompt"; }, 2000);
-        } catch (e) {}
-      });
-
-      // Guide Tabs
-      const tabClaude = document.getElementById("tabClaude");
-      const tabChatgpt = document.getElementById("tabChatgpt");
-      const guideClaude = document.getElementById("guideClaude");
-      const guideChatgpt = document.getElementById("guideChatgpt");
-
-      tabClaude.addEventListener("click", () => {
-        tabClaude.classList.add("active");
-        tabChatgpt.classList.remove("active");
-        guideClaude.classList.remove("hidden");
-        guideChatgpt.classList.add("hidden");
-      });
-
-      tabChatgpt.addEventListener("click", () => {
-        tabChatgpt.classList.add("active");
-        tabClaude.classList.remove("active");
-        guideChatgpt.classList.remove("hidden");
-        guideClaude.classList.add("hidden");
-      });
+      document.getElementById("copyPromptBtn").onclick = function() {
+        copyToClip(finalPrompt.textContent, this, "Copy Studio Prompt");
+      };
 
     } else {
-      // PLAYER MODE
-      playerView.classList.remove("hidden");
+      // --- PLAYER MODE ---
+      document.getElementById("studioFace").classList.add("hidden");
+      document.getElementById("playerFace").classList.remove("hidden");
+      
+      const cleanId = vidId.replace(/[^a-zA-Z0-9_-]/g, "");
+      const mp4Url = `https://res.cloudinary.com/${CLOUD}/video/upload/${cleanId}.mp4`;
+      
+      document.getElementById("videoTitle").textContent = `Render: ${cleanId}`;
+      document.getElementById("topStatus").innerHTML = `<div class="dot"></div> Rendering...`;
 
-      const jobId = shortId
-        ? shortId.replace(/[^a-zA-Z0-9_-]/g, "")
-        : (legacyVideo.match(/\/([^\/]+)\.mp4$/)?.[1] || "k3d_render");
+      let isReady = false;
+      let progress = 10;
+      
+      document.getElementById("shareBtn").onclick = async function() {
+        if(navigator.share) navigator.share({ url: window.location.href });
+        else copyToClip(window.location.href, this, "↗ Share Link");
+      };
 
-      const mp4Url = shortId
-        ? `https://res.cloudinary.com/${CLOUD}/video/upload/${jobId}.mp4`
-        : legacyVideo;
-
-      const renderHud = document.getElementById("renderHud");
-      const hudTitle = document.getElementById("hudTitle");
-      const hudSub = document.getElementById("hudSub");
-      const progressBar = document.getElementById("progressBar");
-      const videoEl = document.getElementById("videoEl");
-      const playerHeading = document.getElementById("playerHeading");
-      const playerMeta = document.getElementById("playerMeta");
-      const downloadBtn = document.getElementById("downloadBtn");
-      const shareBtn = document.getElementById("shareBtn");
-
-      playerHeading.textContent = `360° 3D Render • ${jobId}`;
-      statusChipText.textContent = "Rendering...";
-
-      let ready = false;
-      let progress = 15;
-
-      shareBtn.addEventListener("click", async () => {
-        if (navigator.share) {
-          try { await navigator.share({ title: "Kinetra3D Video", url: window.location.href }); } catch(e) {}
-        } else {
-          try {
-            await navigator.clipboard.writeText(window.location.href);
-            shareBtn.textContent = "✓ Copied";
-            setTimeout(() => { shareBtn.textContent = "↗ Share Link"; }, 2000);
-          } catch(e) {}
-        }
-      });
-
-      function startTimer() {
-        const k = `k3d_t_${jobId}`;
-        let ts = localStorage.getItem(k);
-        if (!ts) {
-          ts = Math.floor(Date.now() / 1000).toString();
-          localStorage.setItem(k, ts);
-        }
-        const base = parseInt(ts, 10);
-
-        setInterval(() => {
-          const left = 300 - (Math.floor(Date.now() / 1000) - base);
-          if (left <= 0) {
-            statusChipText.textContent = "Expired";
-            playerMeta.textContent = "Video auto-deleted after 5 minutes for cloud privacy.";
-          } else {
-            const m = String(Math.floor(left / 60)).padStart(2, "0");
-            const s = String(left % 60).padStart(2, "0");
-            statusChipText.textContent = `Expires ${m}:${s}`;
-          }
-        }, 1000);
+      function unlockVideo() {
+        if(isReady) return;
+        isReady = true;
+        document.getElementById("progressBar").style.width = "100%";
+        document.getElementById("renderHud").classList.add("hidden");
+        
+        const vid = document.getElementById("videoPlayer");
+        vid.style.display = "block";
+        vid.src = mp4Url;
+        vid.load();
+        
+        const dl = document.getElementById("downloadBtn");
+        dl.href = mp4Url;
+        dl.download = `${cleanId}.mp4`;
+        dl.classList.remove("disabled");
+        document.getElementById("shareBtn").classList.remove("disabled");
+        
+        document.getElementById("videoSub").textContent = "Render completed. Video will auto-delete in 5 mins.";
+        document.getElementById("topStatus").innerHTML = `<div class="dot" style="background:#6366F1"></div> Ready`;
       }
 
-      function playVideo() {
-        if (ready) return;
-        ready = true;
-        progressBar.style.width = "100%";
-
-        renderHud.classList.add("hidden");
-        videoEl.style.display = "block";
-        videoEl.src = mp4Url;
-        videoEl.load();
-
-        downloadBtn.href = mp4Url;
-        downloadBtn.setAttribute("download", `${jobId}.mp4`);
-        downloadBtn.classList.remove("disabled");
-        shareBtn.classList.remove("disabled");
-
-        playerMeta.textContent = "Render completed successfully. Watch or download below.";
-        startTimer();
-      }
-
-      async function pollRender() {
-        if (ready) return;
-
-        if (progress < 92) {
+      async function checkEngine() {
+        if(isReady) return;
+        if(progress < 90) {
           progress += 5;
-          progressBar.style.width = `${progress}%`;
+          document.getElementById("progressBar").style.width = progress + "%";
         }
 
         try {
-          const res = await fetch(statusEP);
-          if (res.ok) {
-            const d = await res.json();
-            if (d.conclusion === "failure") {
-              hudTitle.textContent = "Render Failed";
-              hudSub.textContent = "Cloud runner encountered an error.";
-              statusChipText.textContent = "Failed";
-              return;
-            } else if (d.status === "in_progress") {
-              statusChipText.textContent = "Rendering 3D...";
-              hudTitle.textContent = "Rendering 3D Blender Frames...";
+          const res = await fetch(API);
+          if(res.ok) {
+            const data = await res.json();
+            if(data.conclusion === "failure") {
+               document.getElementById("hudTitle").textContent = "Render Failed";
+               document.getElementById("topStatus").innerHTML = "Error";
+               return;
+            } else if(data.status === "in_progress") {
+               document.getElementById("hudTitle").textContent = "Rendering 3D Engine...";
             }
           }
         } catch(e) {}
 
         try {
-          const head = await fetch(mp4Url, { method: "HEAD", cache: "no-store" });
-          if (head.ok) {
-            playVideo();
-            return;
-          }
+          const check = await fetch(mp4Url, { method: "HEAD", cache: "no-store" });
+          if(check.ok) { unlockVideo(); return; }
         } catch(e) {}
 
-        setTimeout(pollRender, 4000);
+        setTimeout(checkEngine, 4000);
       }
-
-      pollRender();
+      checkEngine();
     }
   </script>
 </body>
