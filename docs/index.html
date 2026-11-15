@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your 3D AI Video is Ready</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .warning-box {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 18px;
+        }
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ef4444;
+            display: block;
+            margin-top: 4px;
+        }
+        .ad-slot {
+            background: #0f172a;
+            border: 1px dashed #475569;
+            border-radius: 10px;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 18px 0;
+            color: #94a3b8;
+            font-size: 13px;
+            overflow: hidden;
+        }
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 14px 0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            cursor: not-allowed;
+            background: #475569;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+        .btn.active {
+            background: #22c55e;
+            color: #052e16;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+        .status-text {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 style="margin-top: 0;">🎬 Your 3D Video is Ready!</h2>
+    
+    <div class="warning-box">
+        ⚠️ This video will permanently auto-delete from our server in:
+        <span class="timer" id="deleteTimer">05:00</span>
+    </div>
+
+    <div class="ad-slot" id="adContainer">
+        <div>
+            <p>Advertisement</p>
+        </div>
+    </div>
+
+    <a id="downloadBtn" class="btn">🔒 Unlocking Download in 15s...</a>
+    <p class="status-text" id="statusMsg">Please wait while we verify and prepare your HD MP4 file...</p>
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const videoUrl = params.get("v");
+    const createdAt = parseInt(params.get("t")) || Math.floor(Date.now() / 1000);
+
+    const expiryTime = createdAt + 300;
+    const timerEl = document.getElementById("deleteTimer");
+
+    const deleteInterval = setInterval(() => {
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = expiryTime - now;
+
+        if (remaining <= 0) {
+            clearInterval(deleteInterval);
+            timerEl.innerText = "00:00 (EXPIRED)";
+            document.getElementById("downloadBtn").style.display = "none";
+            document.getElementById("statusMsg").innerText = "❌ Video expired and permanently deleted.";
+            return;
+        }
+
+        const mins = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const secs = String(remaining % 60).padStart(2, '0');
+        timerEl.innerText = `${mins}:${secs}`;
+    }, 1000);
+
+    let adWait = 15;
+    const btn = document.getElementById("downloadBtn");
+    const statusMsg = document.getElementById("statusMsg");
+
+    const adInterval = setInterval(() => {
+        adWait--;
+        if (adWait > 0) {
+            btn.innerText = `🔒 Unlocking Download in ${adWait}s...`;
+        } else {
+            clearInterval(adInterval);
+            if (videoUrl) {
+                btn.classList.add("active");
+                btn.innerText = "⬇️ Download HD Video (MP4)";
+                btn.href = videoUrl;
+                btn.setAttribute("download", "ai-3d-video.mp4");
+                statusMsg.innerText = "✅ Ready! Save it to your device before the timer hits 00:00.";
+            } else {
+                btn.innerText = "⚠️ No Video Link Found";
+                statusMsg.innerText = "Generate a video from ChatGPT or Claude first.";
+            }
+        }
+    }, 1000);
+</script>
+
+</body>
+</html>
