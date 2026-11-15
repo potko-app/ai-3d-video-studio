@@ -56,14 +56,24 @@ duration_cmd = subprocess.check_output([
 audio_seconds = max(5, int(float(duration_cmd)) + 1)
 total_frames = audio_seconds * 24
 
-# 4. Blender Python Script taiyar karein (ChatGPT code ya Default 3D Scene)
+os.makedirs("frames", exist_ok=True)
+
+# 4. Blender 5.0 Compatible Python Script
 default_scene = f"""
 import bpy
 import math
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-scene.render.engine = 'BLENDER_EEVEE'
+
+# Render Engine (Blender 4 & 5 compatible)
+for eng in ['BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH']:
+    try:
+        scene.render.engine = eng
+        break
+    except Exception:
+        pass
+
 scene.render.resolution_x = 1280
 scene.render.resolution_y = 720
 scene.render.fps = 24
@@ -93,10 +103,9 @@ obj.keyframe_insert(data_path="rotation_euler", frame=1)
 obj.rotation_euler = (0, 0, math.radians(360))
 obj.keyframe_insert(data_path="rotation_euler", frame={total_frames})
 
-scene.render.image_settings.file_format = 'FFMPEG'
-scene.render.ffmpeg.format = 'MPEG4'
-scene.render.ffmpeg.codec = 'H264'
-scene.render.filepath = 'raw_3d.mp4'
+# PNG Frames render karein
+scene.render.image_settings.file_format = 'PNG'
+scene.render.filepath = 'frames/frame_'
 bpy.ops.render.render(animation=True)
 """
 
@@ -104,13 +113,14 @@ script_to_run = custom_blender_code if custom_blender_code else default_scene
 with open("scene_script.py", "w") as f:
     f.write(script_to_run)
 
-# Headless Blender chalakar 3D video render karein
+# Headless Blender chalakar 3D frames render karein
 subprocess.run(["blender", "-b", "-P", "scene_script.py"], check=True)
 
-# 5. FFmpeg se 3D Video + Voiceover jodein aur ChatGPT ke liye Preview GIF banayein
+# 5. FFmpeg se PNG Frames + Voiceover jodkar HD MP4 aur Preview GIF banayein
 subprocess.run([
-    "ffmpeg", "-y", "-i", "raw_3d.mp4", "-i", "voice.mp3",
-    "-c:v", "copy", "-c:a", "aac", "-shortest", "final_movie.mp4"
+    "ffmpeg", "-y", "-framerate", "24", "-i", "frames/frame_%04d.png",
+    "-i", "voice.mp3", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-shortest", "final_movie.mp4"
 ], check=True)
 
 subprocess.run([
