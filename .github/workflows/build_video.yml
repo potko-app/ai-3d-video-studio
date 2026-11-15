@@ -1,11 +1,9 @@
 name: Kinetra3D Hollywood Render Engine
 
-# यह इंजन सिर्फ तभी चलेगा जब Worker.js इसे 'render-3d-video' का सिग्नल भेजेगा
 on:
   repository_dispatch:
     types: [render-3d-video]
 
-# 100 वीडियो एक साथ आने पर कतार (Queue) को मैनेज करने की सेटिंग
 concurrency:
   group: 3d-render-${{ github.event.client_payload.job_id }}
   cancel-in-progress: false
@@ -14,17 +12,22 @@ jobs:
   render-movie:
     name: 3D Render & AI Voice
     runs-on: ubuntu-latest
-    timeout-minutes: 5 # क्रैश और जाम से बचाने के लिए 5 मिनट की हार्ड लिमिट
+    timeout-minutes: 5
 
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🛠️ Setup Blender 5.0 & Open-Source Engine
+      - name: 🛠️ Setup Blender 5.0, EGL Graphics & Open-Source Engine
         run: |
+          # 1. ग्राफ़िक्स की मिसिंग EGL लाइब्रेरीज़ और वर्चुअल डिस्प्ले (xvfb) इंस्टॉल करें
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglx-mesa0 xvfb libxkbcommon-x11-0 libsm6 libxext6 libxrender-dev
+          
+          # 2. Blender इंस्टॉल करें
           sudo snap install blender --classic
           
-          # Blender के धांसू ओपन-सोर्स प्लगइन्स (Characters, Landscapes, Lighting) एक्टिवेट करें
+          # 3. Blender के धांसू ओपन-सोर्स प्लगइन्स एक्टिवेट करें
           mkdir -p ~/.config/blender/4.0/scripts/startup
           echo "import bpy" > ~/.config/blender/4.0/scripts/startup/enable_addons.py
           echo "bpy.ops.preferences.addon_enable(module='rigify')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
@@ -36,11 +39,10 @@ jobs:
           BLENDER_CODE: ${{ github.event.client_payload.blender_code }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
         run: |
-          # AI द्वारा भेजे गए कोड को सुरक्षित रूप से पाइथन फाइल में बदलना
           echo "$BLENDER_CODE" > ai_scene.py
           
-          # बैकग्राउंड (Headless) मोड में Blender चलाना
-          blender -b -P ai_scene.py -o //render_output_${JOB_ID}_ -F FFMPEG -x 1 -a
+          # xvfb-run का इस्तेमाल करके वर्चुअल स्क्रीन पर Blender चलाएं (ताकि क्रैश न हो)
+          xvfb-run -a blender -b -P ai_scene.py -o //render_output_${JOB_ID}_ -F FFMPEG -x 1 -a
 
       - name: 🗣️ Generate AI Voiceover & Merge (FFmpeg)
         env:
@@ -49,16 +51,13 @@ jobs:
         run: |
           sudo apt-get install -y ffmpeg edge-tts
           
-          # AI आवाज़ तैयार करना (अगर नरेशन खाली नहीं है)
           if [ -n "$NARRATION" ]; then
             edge-tts --text "$NARRATION" --voice "en-US-ChristopherNeural" --write-media voice_${JOB_ID}.mp3
-            # 3D वीडियो और आवाज़ को आपस में जोड़ना
             ffmpeg -i render_output_${JOB_ID}_0001-0250.mp4 -i voice_${JOB_ID}.mp3 -c:v copy -c:a aac final_${JOB_ID}.mp4
           else
             mv render_output_${JOB_ID}_0001-0250.mp4 final_${JOB_ID}.mp4
           fi
 
-          # प्रीव्यू के लिए GIF बनाना
           ffmpeg -i final_${JOB_ID}.mp4 -vf "fps=10,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
 
       - name: ☁️ Upload to Cloudinary (Auto-Delete after 5 mins)
