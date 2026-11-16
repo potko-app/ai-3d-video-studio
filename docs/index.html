@@ -3,32 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kinetra3D — Cinema 3D Engine</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <title>Kinetra3D Studio</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #07070a;
+      background: #09090b;
       color: #f8fafc;
       font-family: system-ui, -apple-system, sans-serif;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       justify-content: center;
+      align-items: center;
       min-height: 100vh;
     }
-    .box {
+    .card {
       width: 100%;
-      max-width: 700px;
-      background: #111116;
-      border: 1px solid #26262e;
+      max-width: 640px;
+      background: #121216;
+      border: 1px solid #24242b;
       border-radius: 14px;
-      padding: 16px;
-      height: fit-content;
+      padding: 18px;
     }
-    h1 { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 5px; }
-    .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 14px; line-height: 1.4; }
-    .stage {
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 14px;
+      color: #f1f5f9;
+    }
+    .screen {
       width: 100%;
       aspect-ratio: 16/9;
       background: #000;
@@ -37,62 +40,79 @@
       position: relative;
       border: 1px solid #27272a;
     }
-    canvas, video { width: 100%; height: 100%; display: block; object-fit: cover; }
-    video { display: none; }
-    .hud {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      right: 10px;
-      background: rgba(9, 9, 11, 0.88);
-      border: 1px solid rgba(255,255,255,0.12);
-      padding: 9px 12px;
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
+    canvas, video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
     }
-    .bar { width: 150px; height: 5px; background: #27272a; border-radius: 3px; margin-top: 5px; overflow: hidden; }
-    .fill { height: 100%; width: 0%; background: #6366f1; transition: width 0.15s linear; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .btn {
-      padding: 11px;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
+    video { display: none; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 9, 11, 0.82);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+    }
+    .status {
       font-size: 13px;
-      cursor: pointer;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 10px;
+    }
+    .bar {
+      width: 220px;
+      height: 6px;
+      background: #27272a;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .fill {
+      height: 100%;
+      width: 5%;
+      background: #6366f1;
+      transition: width 0.25s ease;
+    }
+    .dl-btn {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 13px;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 600;
       text-align: center;
       text-decoration: none;
-      display: inline-block;
+      cursor: pointer;
     }
-    .btn-primary { background: #6366f1; color: #fff; grid-column: span 2; font-size: 14px; }
-    .btn-primary.disabled { background: #27272a; color: #71717a; pointer-events: none; }
-    .btn-secondary { background: #1c1c22; color: #e2e8f0; border: 1px solid #3f3f46; }
+    .dl-btn.disabled {
+      background: #222228;
+      color: #71717a;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1 id="videoTitle">Kinetra3D Cinema Studio</h1>
-    <p id="narrationText" class="sub">Loading high-detail 3D assets...</p>
+  <div class="card">
+    <h1 id="titleEl">Kinetra3D Studio</h1>
 
-    <div class="stage" id="stage">
-      <video id="recordedVideo" controls playsinline loop></video>
-      <div class="hud" id="hud">
-        <div>
-          <span id="statusText">🎬 Loading 3D Character & Scene...</span>
-          <div class="bar"><div class="fill" id="progressFill"></div></div>
-        </div>
-        <span id="timerText">15s</span>
+    <div class="screen">
+      <canvas id="stageCanvas" width="1280" height="720"></canvas>
+      <video id="finalVideo" controls playsinline loop></video>
+      <div class="overlay" id="loaderOverlay">
+        <div class="status" id="statusEl">Creating 3D Pixar Scenes & Natural Voice...</div>
+        <div class="bar"><div class="fill" id="progressEl"></div></div>
       </div>
     </div>
 
-    <div class="actions">
-      <a id="downloadLink" class="btn btn-primary disabled" download="kinetra3d-cinema.webm">⏳ Preparing HD Video...</a>
-      <button id="voiceBtn" class="btn btn-secondary">🔊 Replay Voiceover</button>
-      <button id="blenderBtn" class="btn btn-secondary">📦 Blender Script (.py)</button>
-    </div>
+    <a id="downloadBtn" class="dl-btn disabled" download="kinetra3d-movie.webm">Generating Video...</a>
   </div>
 
   <script>
@@ -100,234 +120,291 @@
       return decodeURIComponent(atob(str).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""));
     }
 
-    let sceneData = {
-      title: "Cyber Robot Night Walk",
-      narration: "भविष्य के इस चमकते हुए शहर में हमारा रोबोट नए सफ़र पर निकल चुका है!",
-      code: "",
-      bpy: "import bpy\nbpy.ops.mesh.primitive_monkey_add(size=2)\nbpy.ops.object.shade_smooth()"
+    let data = {
+      title: "Magical Forest Adventure",
+      narration: "हे भगवान... [breath] यह जंगल तो सच में जादुई है! [cough] अरे वाह, देखो सामने क्या चमक रहा है!",
+      atmosphere: "magical_forest",
+      code: ""
     };
 
     try {
       const hash = window.location.hash;
       if (hash.startsWith("#scene=")) {
-        const decoded = JSON.parse(b64DecodeUnicode(hash.replace("#scene=", "")));
-        if (decoded) sceneData = { ...sceneData, ...decoded };
+        const parsed = JSON.parse(b64DecodeUnicode(hash.replace("#scene=", "")));
+        if (parsed) data = { ...data, ...parsed };
       }
     } catch (e) {}
 
-    document.getElementById("videoTitle").textContent = sceneData.title;
-    document.getElementById("narrationText").textContent = sceneData.narration || "3D Cinema Render";
+    document.getElementById("titleEl").textContent = data.title || "Kinetra3D Studio";
+    const statusEl = document.getElementById("statusEl");
+    const progressEl = document.getElementById("progressEl");
+    const downloadBtn = document.getElementById("downloadBtn");
 
-    const stage = document.getElementById("stage");
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050711);
-    scene.fog = new THREE.FogExp2(0x050711, 0.022);
-
-    const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 300);
-    camera.position.set(3.5, 2.4, 6.2);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setSize(1280, 720);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.35;
-    stage.insertBefore(renderer.domElement, stage.firstChild);
-
-    // Cinema 3-Point Lighting + Neon Rim
-    scene.add(new THREE.HemisphereLight(0x93c5fd, 0x0f172a, 1.2));
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
-    keyLight.position.set(6, 12, 8);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 1024;
-    keyLight.shadow.mapSize.height = 1024;
-    scene.add(keyLight);
-
-    const pinkLight = new THREE.PointLight(0xf43f5e, 4, 18);
-    pinkLight.position.set(-4, 3, 2);
-    scene.add(pinkLight);
-
-    const cyanLight = new THREE.PointLight(0x38bdf8, 4, 18);
-    cyanLight.position.set(4, 3, -2);
-    scene.add(cyanLight);
-
-    let mixer = null;
-
-    function buildProEnvironment(onReady) {
-      // Glossy Wet Asphalt Road with Lane Markings
-      const road = new THREE.Mesh(
-        new THREE.PlaneGeometry(10, 200),
-        new THREE.MeshStandardMaterial({ color: 0x0b0f19, metalness: 0.75, roughness: 0.2 })
-      );
-      road.rotation.x = -Math.PI / 2;
-      road.receiveShadow = true;
-      scene.add(road);
-
-      // Neon Side Strips
-      const stripMatL = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-      const stripMatR = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
-      const stripL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 200), stripMatL);
-      stripL.position.set(-4.6, 0.03, 0);
-      const stripR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 200), stripMatR);
-      stripR.position.set(4.6, 0.03, 0);
-      scene.add(stripL, stripR);
-
-      // Clean Sidewalk Buildings (Strictly Outside Road: x < -7 or x > 7)
-      const props = [];
-      const glowColors = [0x38bdf8, 0xf43f5e, 0xa855f7, 0x10b981];
-      for (let i = 0; i < 40; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const h = 4 + (i % 5) * 2.5;
-        const b = new THREE.Mesh(
-          new THREE.BoxGeometry(3.2, h, 3.2),
-          new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.6, roughness: 0.25 })
-        );
-        const neonRing = new THREE.Mesh(
-          new THREE.BoxGeometry(3.3, 0.15, 3.3),
-          new THREE.MeshBasicMaterial({ color: glowColors[i % glowColors.length] })
-        );
-        neonRing.position.y = h * 0.35;
-        b.add(neonRing);
-
-        const zPos = -100 + Math.floor(i / 2) * 7;
-        b.position.set(side * 8.5, h / 2, zPos);
-        scene.add(b);
-        props.push(b);
+    // Extract extra scene visual hints if AI passed comments/strings in code
+    function extractVisualSubject() {
+      let extra = "";
+      if (data.code) {
+        const matches = data.code.match(/\/\/.*|['"`][a-zA-Z0-9\s,.-]{10,80}['"`]/g);
+        if (matches) extra = matches.slice(0, 3).join(" ").replace(/\/\/|['"`]/g, "");
       }
-
-      // Starry Sky Particles
-      const starGeo = new THREE.BufferGeometry();
-      const starPos = new Float32Array(300 * 3);
-      for (let i = 0; i < 900; i += 3) {
-        starPos[i] = (Math.random() - 0.5) * 90;
-        starPos[i + 1] = 8 + Math.random() * 35;
-        starPos[i + 2] = (Math.random() - 0.5) * 140;
-      }
-      starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
-      scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xe0f2fe, size: 0.18 })));
-
-      // Load Real High-Detail Rigged 3D Robot Character (GLB)
-      const loader = new THREE.GLTFLoader();
-      loader.load(
-        "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb",
-        (gltf) => {
-          const model = gltf.scene;
-          model.scale.set(0.65, 0.65, 0.65);
-          model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-          scene.add(model);
-
-          mixer = new THREE.AnimationMixer(model);
-          const walkClip = THREE.AnimationClip.findByName(gltf.animations, "Running") || gltf.animations[0];
-          if (walkClip) mixer.clipAction(walkClip).play();
-
-          window.animateScene = function(t, p) {
-            props.forEach(b => {
-              b.position.z += 0.14;
-              if (b.position.z > 30) b.position.z = -110;
-            });
-            const angle = p * Math.PI * 1.5 - 0.6;
-            camera.position.set(Math.sin(angle) * 5.2, 2.2 + Math.sin(t * 1.2) * 0.3, Math.cos(angle) * 5.2);
-            camera.lookAt(0, 1.3, 0);
-          };
-          onReady();
-        },
-        undefined,
-        () => {
-          window.animateScene = function(t, p) {
-            props.forEach(b => { b.position.z += 0.14; if (b.position.z > 30) b.position.z = -110; });
-          };
-          onReady();
-        }
-      );
+      return `${data.title}. ${extra}`.trim();
     }
 
-    function startRecording() {
-      document.getElementById("statusText").textContent = "🔴 Recording Cinema 3D Video...";
-      const canvas = renderer.domElement;
-      const stream = canvas.captureStream(30);
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6000000 });
+    // Generate 4 Consistent 3D Pixar Style Frames with Locked Seed
+    async function loadPixarScenes() {
+      const subject = extractVisualSubject();
+      const lockedSeed = Math.abs(subject.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)) % 999999 + 1000;
+      const angles = [
+        "wide establishing cinematic shot, dramatic volumetric lighting, 3D Pixar Disney animation style, 8k, ultra detailed",
+        "medium character close-up shot, expressive face and eyes, Pixar 3D animated movie frame, soft rim light, 8k",
+        "dynamic low-angle action shot, depth of field, glowing atmosphere, Pixar 3D cinema render, 8k",
+        "emotional golden cinematic ending shot, rich textures, Pixar 3D animation masterpiece, 8k"
+      ];
+
+      const images = [];
+      for (let i = 0; i < angles.length; i++) {
+        statusEl.textContent = `Rendering 3D Scene ${i + 1} of 4...`;
+        progressEl.style.width = `${15 + i * 15}%`;
+        const prompt = encodeURIComponent(`${subject}, ${angles[i]}`);
+        const url = `https://image.pollinations.ai/prompt/${prompt}?width=1280&height=720&seed=${lockedSeed}&nologo=true&model=flux`;
+        const img = await loadImageSafe(url, i);
+        images.push(img);
+      }
+      return images;
+    }
+
+    function loadImageSafe(url, idx) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        const timer = setTimeout(() => resolve(createFallbackFrame(idx)), 14000);
+        img.onload = () => { clearTimeout(timer); resolve(img); };
+        img.onerror = () => { clearTimeout(timer); resolve(createFallbackFrame(idx)); };
+        img.src = url;
+      });
+    }
+
+    function createFallbackFrame(idx) {
+      const c = document.createElement("canvas");
+      c.width = 1280; c.height = 720;
+      const g = c.getContext("2d");
+      const grad = g.createRadialGradient(640, 360, 60, 640, 360, 720);
+      const palettes = [["#1e1b4b", "#09090b"], ["#064e3b", "#09090b"], ["#4c0519", "#09090b"], ["#172554", "#09090b"]];
+      grad.addColorStop(0, palettes[idx % 4][0]);
+      grad.addColorStop(1, palettes[idx % 4][1]);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 1280, 720);
+      return c;
+    }
+
+    // Procedural Realistic Human Breath & Cough SFX via Web Audio API
+    function playNaturalBreath(ctx, dest, time, isCough = false) {
+      const dur = isCough ? 0.32 : 0.48;
+      const bufSize = Math.floor(ctx.sampleRate * dur);
+      const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) {
+        const t = i / bufSize;
+        const env = isCough
+          ? Math.sin(Math.min(1, t * 4) * Math.PI) * Math.exp(-t * 6)
+          : Math.sin(t * Math.PI) * 0.45;
+        output[i] = (Math.random() * 2 - 1) * env;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = isCough ? 650 : 950;
+      filter.Q.value = isCough ? 1.8 : 0.9;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(isCough ? 0.45 : 0.22, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(dest);
+      gain.connect(ctx.destination);
+      noise.start(time);
+    }
+
+    // Fetch Neural TTS Audio Buffer so it records cleanly into video
+    async function fetchVoiceBuffer(ctx, text) {
+      const clean = text.replace(/\[breath\]|\[cough\]|\[sigh\]/gi, "").trim();
+      if (!clean) return null;
+      const isHindi = /[\u0900-\u097F]/.test(clean);
+      const voice = isHindi ? "Aditi" : "Matthew";
+      const urls = [
+        `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(clean)}`,
+        `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${isHindi ? "hi" : "en"}&q=${encodeURIComponent(clean.slice(0, 200))}`
+      ];
+      for (const u of urls) {
+        try {
+          const res = await fetch(u);
+          if (!res.ok) continue;
+          const arr = await res.arrayBuffer();
+          return await ctx.decodeAudioData(arr);
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    async function buildAndRecordMovie() {
+      const scenes = await loadPixarScenes();
+      statusEl.textContent = "Recording Natural Voice & Cinema Video...";
+      progressEl.style.width = "75%";
+
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+      const audioDest = audioCtx.createMediaStreamDestination();
+
+      // Subtle Cinematic Ambient Pad
+      const osc = audioCtx.createOscillator();
+      const padGain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 110;
+      padGain.gain.value = 0.025;
+      osc.connect(padGain);
+      padGain.connect(audioDest);
+      osc.start();
+
+      // Split narration into natural phrases with breath/cough cues
+      const rawNarration = (data.narration || "").trim();
+      const parts = rawNarration.split(/(\[breath\]|\[cough\]|\[sigh\]|[।!?.,]+)/i).filter(p => p && p.trim());
+      let scheduleTime = audioCtx.currentTime + 0.3;
+      let totalAudioDuration = 0;
+
+      for (const part of parts) {
+        const lower = part.toLowerCase().trim();
+        if (lower === "[cough]") {
+          playNaturalBreath(audioCtx, audioDest, scheduleTime, true);
+          scheduleTime += 0.45;
+        } else if (lower === "[breath]" || lower === "[sigh]") {
+          playNaturalBreath(audioCtx, audioDest, scheduleTime, false);
+          scheduleTime += 0.5;
+        } else if (/^[।!?.,]+$/.test(lower)) {
+          // Natural breath pause at sentence end
+          playNaturalBreath(audioCtx, audioDest, scheduleTime, false);
+          scheduleTime += 0.38;
+        } else {
+          const buf = await fetchVoiceBuffer(audioCtx, part);
+          if (buf) {
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(audioDest);
+            src.connect(audioCtx.destination);
+            src.start(scheduleTime);
+            scheduleTime += buf.duration + 0.12;
+          }
+        }
+      }
+      totalAudioDuration = Math.max(12000, Math.min(25000, (scheduleTime - audioCtx.currentTime + 0.8) * 1000));
+
+      // Combine Canvas Video Stream + Mixed Audio Stream
+      const canvas = document.getElementById("stageCanvas");
+      const ctx2d = canvas.getContext("2d");
+      const videoStream = canvas.captureStream(30);
+      const combinedStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...audioDest.stream.getAudioTracks()
+      ]);
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : "video/webm";
+      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 5000000 });
       const chunks = [];
 
       recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = () => {
+        osc.stop();
         const blob = new Blob(chunks, { type: "video/webm" });
-        const videoUrl = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
 
+        document.getElementById("loaderOverlay").style.display = "none";
         canvas.style.display = "none";
-        document.getElementById("hud").style.display = "none";
 
-        const vidEl = document.getElementById("recordedVideo");
-        vidEl.src = videoUrl;
-        vidEl.style.display = "block";
-        vidEl.play().catch(() => {});
+        const vid = document.getElementById("finalVideo");
+        vid.src = url;
+        vid.style.display = "block";
+        vid.play().catch(() => {});
 
-        const dl = document.getElementById("downloadLink");
-        dl.href = videoUrl;
-        dl.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ".webm";
-        dl.textContent = "⬇️ Download HD 3D Video";
-        dl.classList.remove("disabled");
+        downloadBtn.href = url;
+        downloadBtn.download = (data.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ".webm";
+        downloadBtn.textContent = "Download Video";
+        downloadBtn.classList.remove("disabled");
       };
 
-      const DURATION = 15000;
+      // Floating dust/sparkle particles
+      const particles = Array.from({ length: 45 }, () => ({
+        x: Math.random() * 1280,
+        y: Math.random() * 720,
+        r: 1.5 + Math.random() * 2.5,
+        vy: -0.3 - Math.random() * 0.6,
+        vx: (Math.random() - 0.5) * 0.4
+      }));
+
       const startTime = performance.now();
-      let lastFrameTime = startTime;
       recorder.start();
-      speakNarration();
 
-      function renderLoop(now) {
-        const dt = (now - lastFrameTime) / 1000;
-        lastFrameTime = now;
+      function animateFrame(now) {
         const elapsed = now - startTime;
-        const progress = Math.min(1, elapsed / DURATION);
-        const t = elapsed / 1000;
+        const progress = Math.min(1, elapsed / totalAudioDuration);
+        progressEl.style.width = `${75 + Math.floor(progress * 25)}%`;
 
-        if (mixer) mixer.update(dt);
-        if (typeof window.animateScene === "function") {
-          try { window.animateScene(t, progress); } catch (e) {}
+        const sceneFloat = progress * scenes.length;
+        const idx = Math.min(scenes.length - 1, Math.floor(sceneFloat));
+        const localP = sceneFloat - idx;
+        const img = scenes[idx];
+
+        // Smooth 3D Cinema Camera Zoom & Pan + Voice Pulse
+        const voicePulse = Math.abs(Math.sin(elapsed * 0.014)) * 0.012;
+        const scale = 1.04 + localP * 0.1 + voicePulse;
+        const panX = (idx % 2 === 0 ? -1 : 1) * (localP - 0.5) * 45;
+        const panY = Math.sin(localP * Math.PI) * -15;
+
+        ctx2d.fillStyle = "#000";
+        ctx2d.fillRect(0, 0, 1280, 720);
+
+        ctx2d.save();
+        ctx2d.translate(640 + panX, 360 + panY);
+        ctx2d.scale(scale, scale);
+        ctx2d.drawImage(img, -640, -360, 1280, 720);
+        ctx2d.restore();
+
+        // Atmospheric Particles
+        ctx2d.fillStyle = "rgba(255, 245, 200, 0.55)";
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.y < 0) p.y = 720;
+          if (p.x < 0) p.x = 1280;
+          if (p.x > 1280) p.x = 0;
+          ctx2d.beginPath();
+          ctx2d.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx2d.fill();
         }
-        renderer.render(scene, camera);
 
-        document.getElementById("progressFill").style.width = Math.floor(progress * 100) + "%";
-        document.getElementById("timerText").textContent = Math.max(0, Math.ceil((DURATION - elapsed) / 1000)) + "s";
+        // Subtle Cinema Vignette
+        const vig = ctx2d.createRadialGradient(640, 360, 380, 640, 360, 760);
+        vig.addColorStop(0, "rgba(0,0,0,0)");
+        vig.addColorStop(1, "rgba(0,0,0,0.45)");
+        ctx2d.fillStyle = vig;
+        ctx2d.fillRect(0, 0, 1280, 720);
 
         if (progress < 1) {
-          requestAnimationFrame(renderLoop);
+          requestAnimationFrame(animateFrame);
         } else {
           recorder.stop();
         }
       }
-      requestAnimationFrame(renderLoop);
+
+      requestAnimationFrame(animateFrame);
     }
 
-    function speakNarration() {
-      if (!sceneData.narration || !("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(sceneData.narration);
-      u.lang = /[\u0900-\u097F]/.test(sceneData.narration) ? "hi-IN" : "en-US";
-      window.speechSynthesis.speak(u);
-    }
-
-    document.getElementById("voiceBtn").addEventListener("click", speakNarration);
-    document.getElementById("blenderBtn").addEventListener("click", () => {
-      const blob = new Blob([sceneData.bpy || "# Blender Script"], { type: "text/plain" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "kinetra3d_blender_scene.py";
-      a.click();
-    });
-
-    if (sceneData.code && sceneData.code.trim().length > 20) {
-      try {
-        const runCustom = new Function("scene", "camera", "renderer", "THREE", sceneData.code);
-        runCustom(scene, camera, renderer, THREE);
-        startRecording();
-      } catch (err) {
-        buildProEnvironment(startRecording);
-      }
-    } else {
-      buildProEnvironment(startRecording);
-    }
+    buildAndRecordMovie();
   </script>
 </body>
 </html>
