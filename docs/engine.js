@@ -26,12 +26,13 @@
       if (parsed) sceneData = { ...sceneData, ...parsed };
     }
   } catch (err) {
-    console.error("Scene payload parse fallback:", err);
+    console.error("Payload parse fallback:", err);
   }
 
-  // UI Elements Reference
+  // UI Elements
   const uiTitle = document.getElementById("uiTitle");
   const uiBadge = document.getElementById("uiBadge");
+  const uiStatus = document.getElementById("uiStatus");
   const uiProgress = document.getElementById("uiProgress");
   const uiTimer = document.getElementById("uiTimer");
   const uiDownloadBtn = document.getElementById("uiDownloadBtn");
@@ -39,13 +40,26 @@
 
   uiTitle.textContent = sceneData.title || "Kinetra3D Studio";
 
-  // 2. Three.js Cinema WebGL Renderer Setup
+  // 2. Dynamically Load GLTFLoader for Real 3D .glb Studio Assets
+  function loadGLTFLoaderScript() {
+    return new Promise((resolve) => {
+      if (THREE.GLTFLoader) return resolve(true);
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
+      const t = setTimeout(() => resolve(false), 3000);
+      s.onload = () => { clearTimeout(t); resolve(true); };
+      s.onerror = () => { clearTimeout(t); resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // 3. Three.js Cinema WebGL Setup + Blender EEVEE-Style GLSL Rim Shader
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(1280, 720);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.28;
   previewContainer.insertBefore(renderer.domElement, previewContainer.firstChild);
 
   const scene = new THREE.Scene();
@@ -54,89 +68,202 @@
     magical_forest: { bg: 0x061712, fog: 0x061712, key: 0x34d399, rim: 0x38bdf8 },
     sunset_golden: { bg: 0x1f0e06, fog: 0x1f0e06, key: 0xfbbf24, rim: 0xf97316 },
     space_cosmos: { bg: 0x04040c, fog: 0x04040c, key: 0xa78bfa, rim: 0x38bdf8 },
-    studio_clean: { bg: 0x14161f, fog: 0x14161f, key: 0xfff7ed, rim: 0x818cf8 }
+    studio_clean: { bg: 0x12141d, fog: 0x12141d, key: 0xfff7ed, rim: 0x818cf8 }
   };
   const activeTheme = themes[sceneData.atmosphere] || themes.studio_clean;
   scene.background = new THREE.Color(activeTheme.bg);
   scene.fog = new THREE.FogExp2(activeTheme.fog, 0.016);
 
   const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 250);
-  camera.position.set(0, 2.4, 7.2);
+  camera.position.set(0, 2.2, 6.5);
 
-  // Studio 3-Point Lighting
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x1e293b, 1.35));
-  const keyLight = new THREE.DirectionalLight(activeTheme.key, 2.3);
+  // Blender-Style 3-Point Studio Lighting
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x1e293b, 1.4));
+  const keyLight = new THREE.DirectionalLight(activeTheme.key, 2.4);
   keyLight.position.set(6, 12, 8);
   keyLight.castShadow = true;
   scene.add(keyLight);
 
-  const rimLight = new THREE.PointLight(activeTheme.rim, 3.8, 28);
+  const rimLight = new THREE.PointLight(activeTheme.rim, 4.0, 28);
   rimLight.position.set(-5, 4, -4);
   scene.add(rimLight);
 
-  function buildDefaultCinemaScene() {
+  // Blender EEVEE-Inspired Custom GLSL Fresnel Atmosphere Dome
+  const glslDome = new THREE.Mesh(
+    new THREE.SphereGeometry(45, 32, 32),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor: { value: new THREE.Color(activeTheme.key).multiplyScalar(0.18) },
+        bottomColor: { value: new THREE.Color(activeTheme.bg) }
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y * 0.5 + 0.5;
+          gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 1.5)), 1.0);
+        }
+      `
+    })
+  );
+  scene.add(glslDome);
+
+  // 4. Built-in Open-Source .GLB Studio Asset Library
+  const GLB_LIBRARY = [
+    {
+      keywords: ["fox", "लोमड़ी", "animal", "jungle", "forest", "जंगल", "dog", "wolf"],
+      url: "https://threejs.org/examples/models/gltf/Fox/glTF-Binary/Fox.glb",
+      clip: "Run"
+    },
+    {
+      keywords: ["horse", "घोड़ा", "race", "desert", "cowboy", "western"],
+      url: "https://threejs.org/examples/models/gltf/Horse.glb",
+      clip: ""
+    },
+    {
+      keywords: ["bird", "पक्षी", "sky", "fly", "आसमान", "flamingo"],
+      url: "https://threejs.org/examples/models/gltf/Flamingo.glb",
+      clip: ""
+    },
+    {
+      keywords: ["helmet", "space", "अंतरिक्ष", "sci-fi", "astronaut", "cyber"],
+      url: "https://threejs.org/examples/models/gltf/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+      clip: ""
+    },
+    {
+      keywords: ["robot", "रोबोट", "boy", "character", "dance", "walk", "default"],
+      url: "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb",
+      clip: "Walking"
+    }
+  ];
+
+  function pickBestGLBModel() {
+    const query = `${sceneData.title} ${sceneData.narration}`.toLowerCase();
+    for (const item of GLB_LIBRARY) {
+      if (item.keywords.some(k => query.includes(k))) return item;
+    }
+    return GLB_LIBRARY[GLB_LIBRARY.length - 1];
+  }
+
+  let mixer = null;
+  let loadedModel = null;
+
+  async function buildStudioGLBScene() {
+    // Reflective Studio Pedestal
     const stage = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.5, 3.8, 0.25, 64),
-      new THREE.MeshStandardMaterial({ color: 0x18181f, metalness: 0.8, roughness: 0.2 })
+      new THREE.CylinderGeometry(3.4, 3.7, 0.25, 64),
+      new THREE.MeshStandardMaterial({ color: 0x181820, metalness: 0.85, roughness: 0.18 })
     );
     stage.position.y = -1.2;
     stage.receiveShadow = true;
     scene.add(stage);
 
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(3.55, 0.04, 16, 100),
+      new THREE.TorusGeometry(3.45, 0.035, 16, 100),
       new THREE.MeshBasicMaterial({ color: activeTheme.key })
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = -1.06;
     scene.add(ring);
 
-    const core = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(0.95, 0.3, 140, 32),
-      new THREE.MeshStandardMaterial({ color: activeTheme.key, metalness: 0.85, roughness: 0.12 })
-    );
-    core.position.y = 0.35;
-    core.castShadow = true;
-    scene.add(core);
-
     const pGeo = new THREE.BufferGeometry();
-    const pPos = new Float32Array(240 * 3);
-    for (let i = 0; i < 720; i += 3) {
-      pPos[i] = (Math.random() - 0.5) * 26;
-      pPos[i + 1] = -1 + Math.random() * 14;
-      pPos[i + 2] = (Math.random() - 0.5) * 26;
+    const pPos = new Float32Array(220 * 3);
+    for (let i = 0; i < 660; i += 3) {
+      pPos[i] = (Math.random() - 0.5) * 24;
+      pPos[i + 1] = -1 + Math.random() * 12;
+      pPos[i + 2] = (Math.random() - 0.5) * 24;
     }
     pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
-    const stars = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 }));
+    const stars = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09 }));
     scene.add(stars);
 
+    const hasLoader = await loadGLTFLoaderScript();
+    const chosen = pickBestGLBModel();
+
+    await new Promise((resolve) => {
+      if (!hasLoader || !THREE.GLTFLoader) return resolve();
+      let finished = false;
+      const done = () => { if (!finished) { finished = true; resolve(); } };
+      setTimeout(done, 3500); // Hard 3.5s safety limit so it never hangs
+
+      const loader = new THREE.GLTFLoader();
+      loader.load(
+        chosen.url,
+        (gltf) => {
+          if (finished) return;
+          loadedModel = gltf.scene;
+          const box = new THREE.Box3().setFromObject(loadedModel);
+          const size = box.getSize(new THREE.Vector3()).length();
+          const scale = 2.6 / (size || 1);
+          loadedModel.scale.setScalar(scale);
+
+          const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scale);
+          loadedModel.position.set(-center.x, -box.min.y * scale - 1.05, -center.z);
+
+          loadedModel.traverse(c => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          scene.add(loadedModel);
+
+          if (gltf.animations && gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(loadedModel);
+            const clip = (chosen.clip && THREE.AnimationClip.findByName(gltf.animations, chosen.clip)) || gltf.animations[0];
+            mixer.clipAction(clip).play();
+          }
+          done();
+        },
+        undefined,
+        () => done()
+      );
+    });
+
+    if (!loadedModel) {
+      loadedModel = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.9, 0.28, 140, 32),
+        new THREE.MeshStandardMaterial({ color: activeTheme.key, metalness: 0.88, roughness: 0.12 })
+      );
+      loadedModel.position.y = 0.35;
+      scene.add(loadedModel);
+    }
+
     window.animateScene = function (t, p) {
-      core.rotation.y = t * 0.9;
-      core.rotation.x = Math.sin(t * 0.6) * 0.35;
+      if (!mixer && loadedModel) {
+        loadedModel.rotation.y = t * 0.7;
+      }
       ring.scale.setScalar(1 + Math.sin(t * 3) * 0.02);
       stars.rotation.y = t * 0.08;
-      const angle = p * Math.PI * 1.6 - 0.8;
-      camera.position.set(Math.sin(angle) * 5.8, 1.8 + Math.sin(t) * 0.25, Math.cos(angle) * 5.8);
+      const angle = p * Math.PI * 1.5 - 0.75;
+      camera.position.set(Math.sin(angle) * 5.2, 1.65 + Math.sin(t * 0.9) * 0.25, Math.cos(angle) * 5.2);
       camera.lookAt(0, 0.3, 0);
     };
   }
 
-  // 3. Studio Voice Mastering Chain (Deep Bass Punch + Vocal Clarity + Compressor)
+  // 5. Studio Voice Mastering Chain (Deep Bass Punch + Vocal Clarity + Compressor)
   function createStudioVoiceBus(ctx, dest) {
-    // Low-shelf EQ for deep, powerful chest resonance ("दम")
     const warmthEQ = ctx.createBiquadFilter();
     warmthEQ.type = "lowshelf";
     warmthEQ.frequency.value = 160;
     warmthEQ.gain.value = 5.5;
 
-    // Peaking EQ for crisp storytelling clarity
     const clarityEQ = ctx.createBiquadFilter();
     clarityEQ.type = "peaking";
     clarityEQ.frequency.value = 3200;
     clarityEQ.Q.value = 1.1;
     clarityEQ.gain.value = 3.5;
 
-    // Broadcast Compressor so every word sounds rich and balanced
     const compressor = ctx.createDynamicsCompressor();
     compressor.threshold.value = -20;
     compressor.knee.value = 18;
@@ -156,7 +283,6 @@
     return warmthEQ;
   }
 
-  // 4. Split Script into Emotional Sentences (No fake noise on punctuation!)
   function splitIntoEmotionalBeats(text) {
     const clean = text.replace(/\[.*?\]/g, " ").replace(/\s+/g, " ").trim();
     if (!clean) return [];
@@ -169,15 +295,15 @@
 
       if (trimmed.endsWith("?")) {
         rate = 1.03;
-        detune = 35; // Natural questioning lift
+        detune = 35;
         pauseAfter = 0.42;
       } else if (trimmed.endsWith("!")) {
         rate = 1.05;
-        detune = 20; // Energetic dramatic punch
+        detune = 20;
         pauseAfter = 0.38;
       } else if (trimmed.includes("...") || trimmed.endsWith("…")) {
         rate = 0.93;
-        detune = -30; // Deep suspenseful slowdown
+        detune = -30;
         pauseAfter = 0.48;
       }
       return { text: trimmed, rate, detune, pauseAfter };
@@ -205,8 +331,9 @@
     return null;
   }
 
-  // 5. Master Production & Live Preview Loop
+  // 6. Master Production & Live Preview Loop
   async function runEngine() {
+    uiStatus.textContent = "Loading 3D Studio Assets & Voice...";
     let customLoaded = false;
     if (sceneData.code && sceneData.code.trim().length > 20) {
       try {
@@ -214,17 +341,20 @@
         buildCustom(scene, camera, renderer, THREE);
         customLoaded = true;
       } catch (err) {
-        console.error("Custom scene error, using default:", err);
+        console.error("Custom scene error, loading studio GLB asset:", err);
       }
     }
-    if (!customLoaded) buildDefaultCinemaScene();
+    if (!customLoaded) {
+      await buildStudioGLBScene();
+    }
+
+    uiStatus.textContent = "Rendering 3D Cinema & Studio Voice...";
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioCtx();
     if (audioCtx.state === "suspended") await audioCtx.resume();
     const audioDest = audioCtx.createMediaStreamDestination();
 
-    // Warm Soft Ambient Cinema Bed (Low-pass filtered so it never buzzes)
     const padFilter = audioCtx.createBiquadFilter();
     padFilter.type = "lowpass";
     padFilter.frequency.value = 280;
@@ -235,10 +365,10 @@
 
     const osc1 = audioCtx.createOscillator();
     osc1.type = "triangle";
-    osc1.frequency.value = 130.81; // C3 warm root
+    osc1.frequency.value = 130.81;
     const osc2 = audioCtx.createOscillator();
     osc2.type = "sine";
-    osc2.frequency.value = 196.00; // G3 soft fifth
+    osc2.frequency.value = 196.00;
     osc1.connect(padFilter);
     osc2.connect(padFilter);
     osc1.start();
@@ -261,7 +391,6 @@
       }
     }
 
-    // Match video length smoothly to narration (15s to 22s max)
     const spokenDurationMs = (cursor - audioCtx.currentTime + 0.6) * 1000;
     const DURATION = beats.length > 0 ? Math.max(15000, Math.min(22000, spokenDurationMs)) : 15000;
 
@@ -303,13 +432,17 @@
     };
 
     const startTime = performance.now();
+    let lastTime = startTime;
     recorder.start();
 
     function frameStep(now) {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / DURATION);
       const t = elapsed / 1000;
 
+      if (mixer) mixer.update(dt);
       if (typeof window.animateScene === "function") {
         try { window.animateScene(t, progress); } catch (e) {}
       }
