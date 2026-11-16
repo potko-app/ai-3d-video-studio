@@ -18,65 +18,105 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🛠️ Setup Blender 5.0, EGL Graphics & Open-Source Engine
+      - name: 🛠️ Setup Blender, Virtual Display & Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y libegl1 libgl1 libglx-mesa0 xvfb libxkbcommon-x11-0 libsm6 libxext6 libxrender-dev python3-pip ffmpeg
           sudo snap install blender --classic
-          
-          mkdir -p ~/.config/blender/4.0/scripts/startup
-          echo "import bpy" > ~/.config/blender/4.0/scripts/startup/enable_addons.py
-          echo "bpy.ops.preferences.addon_enable(module='rigify')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
-          echo "bpy.ops.preferences.addon_enable(module='ant_landscape')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
-          echo "bpy.ops.preferences.addon_enable(module='node_wrangler')" >> ~/.config/blender/4.0/scripts/startup/enable_addons.py
+          pip3 install --break-system-packages edge-tts
 
-      - name: 🧠 AI Script Injection & Fast CPU 3D Rendering
+      - name: 🧠 Build & Render 3D Scene (Crash-Proof)
         env:
           BLENDER_CODE: ${{ github.event.client_payload.blender_code }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
         run: |
-          cat << 'EOF' > speed_patch.py
+          python3 - << 'EOF'
+          import os
+
+          code = os.environ.get("BLENDER_CODE", "")
+
+          fixer = """
           import bpy
-          for scene in bpy.data.scenes:
+
+          # Enable open-source addons safely
+          for addon in ['rigify', 'ant_landscape', 'node_wrangler']:
+              try:
+                  bpy.ops.preferences.addon_enable(module=addon)
+              except Exception:
+                  pass
+
+          scene = bpy.context.scene
+
+          # Ensure a camera exists
+          if not any(obj.type == 'CAMERA' for obj in scene.objects):
+              bpy.ops.object.camera_add(location=(0, -10, 5), rotation=(1.15, 0, 0))
+              scene.camera = bpy.context.active_object
+
+          # Ensure a light exists
+          if not any(obj.type == 'LIGHT' for obj in scene.objects):
+              bpy.ops.object.light_add(type='SUN', location=(5, -5, 10))
+
+          # Fast CPU Render Optimization (Blender 4 & 5 compatible)
+          try:
               scene.render.engine = 'BLENDER_EEVEE_NEXT'
+          except Exception:
+              scene.render.engine = 'BLENDER_EEVEE'
+
+          try:
               scene.eevee.taa_samples = 8
-              scene.render.resolution_x = 1280
-              scene.render.resolution_y = 720
+          except Exception:
+              pass
+
+          scene.render.resolution_x = 1280
+          scene.render.resolution_y = 720
+          scene.render.fps = 15
+          if scene.frame_end > 225:
+              scene.frame_end = 225  # Max 15s at 15fps for ultra-fast CPU speed
+          scene.render.image_settings.file_format = 'PNG'
+          """
+
+          with open("ai_scene.py", "w", encoding="utf-8") as f:
+              f.write(code + "\n" + fixer)
           EOF
 
-          echo "$BLENDER_CODE" > ai_scene.py
-          cat speed_patch.py >> ai_scene.py
+          xvfb-run -a blender -b -P ai_scene.py -o //frame_ -F PNG -x 1 -a
 
-          xvfb-run -a blender -b -P ai_scene.py -o //render_output_${JOB_ID}_ -F FFMPEG -x 1 -a
-
-      - name: 🗣️ Generate AI Voiceover & Merge (FFmpeg)
+      - name: 🗣️ Compile Video & Auto-Detect AI Voiceover
         env:
           NARRATION: ${{ github.event.client_payload.narration }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
         run: |
-          # Python pip के ज़रिए edge-tts को सही तरीके से इंस्टॉल करना
-          pip3 install edge-tts
-          
+          ffmpeg -y -framerate 15 -i frame_%04d.png -c:v libx264 -pix_fmt yuv420p raw_${JOB_ID}.mp4
+
           if [ -n "$NARRATION" ]; then
-            edge-tts --text "$NARRATION" --voice "en-US-ChristopherNeural" --write-media voice_${JOB_ID}.mp3
-            ffmpeg -i render_output_${JOB_ID}_0001-0250.mp4 -i voice_${JOB_ID}.mp3 -c:v copy -c:a aac final_${JOB_ID}.mp4
-          else
-            mv render_output_${JOB_ID}_0001-0250.mp4 final_${JOB_ID}.mp4
+            python3 - << 'EOF'
+          import os, re, subprocess
+          text = os.environ.get("NARRATION", "").strip()
+          job_id = os.environ.get("JOB_ID", "render")
+          # Detect Hindi characters for Hindi voice, else English
+          voice = "hi-IN-MadhurNeural" if re.search(r'[\u0900-\u097F]', text) else "en-US-ChristopherNeural"
+          subprocess.run(["edge-tts", "--text", text, "--voice", voice, "--write-media", f"voice_{job_id}.mp3"], check=False)
+          EOF
           fi
 
-          ffmpeg -i final_${JOB_ID}.mp4 -vf "fps=15,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
+          if [ -f "voice_${JOB_ID}.mp3" ]; then
+            ffmpeg -y -i raw_${JOB_ID}.mp4 -i voice_${JOB_ID}.mp3 -c:v copy -c:a aac -shortest final_${JOB_ID}.mp4
+          else
+            mv raw_${JOB_ID}.mp4 final_${JOB_ID}.mp4
+          fi
 
-      - name: ☁️ Upload to Cloudinary (Auto-Delete after 5 mins)
+          ffmpeg -y -i final_${JOB_ID}.mp4 -vf "fps=10,scale=320:-1:flags=lanczos" -c:v gif preview_${JOB_ID}.gif
+
+      - name: ☁️ Upload to Cloudinary
         env:
-          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
         run: |
-          curl -X POST "https://api.cloudinary.com/v1_1/cltgefea/video/upload" \
+          curl -f -X POST "https://api.cloudinary.com/v1_1/cltgefea/video/upload" \
             -F "file=@final_${JOB_ID}.mp4" \
             -F "public_id=${JOB_ID}" \
             -F "upload_preset=ml_default"
-            
-          curl -X POST "https://api.cloudinary.com/v1_1/cltgefea/image/upload" \
+
+          curl -f -X POST "https://api.cloudinary.com/v1_1/cltgefea/image/upload" \
             -F "file=@preview_${JOB_ID}.gif" \
             -F "public_id=${JOB_ID}_preview" \
             -F "upload_preset=ml_default"
