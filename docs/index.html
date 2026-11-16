@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kinetra3D Studio</title>
+  <title>Kinetra3D — Cinema 3D Studio</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -18,9 +27,9 @@
     }
     .card {
       width: 100%;
-      max-width: 640px;
-      background: #121216;
-      border: 1px solid #24242b;
+      max-width: 660px;
+      background: #111115;
+      border: 1px solid #23232a;
       border-radius: 14px;
       padding: 18px;
     }
@@ -47,35 +56,33 @@
       object-fit: cover;
     }
     video { display: none; }
-    .overlay {
+    .hud {
       position: absolute;
-      inset: 0;
-      background: rgba(9, 9, 11, 0.82);
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(9, 9, 11, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 14px;
+      border-radius: 8px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
+      justify-content: space-between;
       align-items: center;
-      padding: 20px;
-      text-align: center;
-    }
-    .status {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e2e8f0;
-      margin-bottom: 10px;
+      font-size: 12px;
     }
     .bar {
-      width: 220px;
-      height: 6px;
+      width: 160px;
+      height: 5px;
       background: #27272a;
       border-radius: 99px;
+      margin-top: 5px;
       overflow: hidden;
     }
     .fill {
       height: 100%;
       width: 5%;
       background: #6366f1;
-      transition: width 0.25s ease;
+      transition: width 0.2s linear;
     }
     .dl-btn {
       display: block;
@@ -103,16 +110,18 @@
   <div class="card">
     <h1 id="titleEl">Kinetra3D Studio</h1>
 
-    <div class="screen">
-      <canvas id="stageCanvas" width="1280" height="720"></canvas>
+    <div class="screen" id="screenBox">
       <video id="finalVideo" controls playsinline loop></video>
-      <div class="overlay" id="loaderOverlay">
-        <div class="status" id="statusEl">Creating 3D Pixar Scenes & Natural Voice...</div>
-        <div class="bar"><div class="fill" id="progressEl"></div></div>
+      <div class="hud" id="hudOverlay">
+        <div>
+          <span id="statusEl">Rendering HDRI 3D Scene & Natural Voice...</span>
+          <div class="bar"><div class="fill" id="progressEl"></div></div>
+        </div>
+        <span id="timerEl">15s</span>
       </div>
     </div>
 
-    <a id="downloadBtn" class="dl-btn disabled" download="kinetra3d-movie.webm">Generating Video...</a>
+    <a id="downloadBtn" class="dl-btn disabled" download="kinetra3d-movie.webm">Preparing Video...</a>
   </div>
 
   <script>
@@ -121,9 +130,9 @@
     }
 
     let data = {
-      title: "Magical Forest Adventure",
-      narration: "हे भगवान... [breath] यह जंगल तो सच में जादुई है! [cough] अरे वाह, देखो सामने क्या चमक रहा है!",
-      atmosphere: "magical_forest",
+      title: "Cyber Explorer 3D",
+      narration: "हे भगवान... [breath] इस भविष्य की दुनिया में यह ऊर्जा कितनी शक्तिशाली है! [cough] चलो, आगे बढ़ते हैं!",
+      atmosphere: "cyber_neon",
       code: ""
     };
 
@@ -138,66 +147,132 @@
     document.getElementById("titleEl").textContent = data.title || "Kinetra3D Studio";
     const statusEl = document.getElementById("statusEl");
     const progressEl = document.getElementById("progressEl");
+    const timerEl = document.getElementById("timerEl");
     const downloadBtn = document.getElementById("downloadBtn");
 
-    // Extract extra scene visual hints if AI passed comments/strings in code
-    function extractVisualSubject() {
-      let extra = "";
-      if (data.code) {
-        const matches = data.code.match(/\/\/.*|['"`][a-zA-Z0-9\s,.-]{10,80}['"`]/g);
-        if (matches) extra = matches.slice(0, 3).join(" ").replace(/\/\/|['"`]/g, "");
-      }
-      return `${data.title}. ${extra}`.trim();
+    // 1. Setup Cinema Renderer with HDRI Environment & UnrealBloom
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(1280, 720);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    document.getElementById("screenBox").insertBefore(renderer.domElement, document.getElementById("screenBox").firstChild);
+
+    const scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+
+    const presets = {
+      cyber_neon: { bg: 0x050711, fog: 0x050711, key: 0x60a5fa, rim: 0xf43f5e, model: "https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf" },
+      magical_forest: { bg: 0x04120e, fog: 0x04120e, key: 0x34d399, rim: 0x38bdf8, model: "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb" },
+      sunset_golden: { bg: 0x160a05, fog: 0x160a05, key: 0xfbbf24, rim: 0xf97316, model: "https://threejs.org/examples/models/gltf/Horse.glb" },
+      space_cosmos: { bg: 0x030308, fog: 0x030308, key: 0xa78bfa, rim: 0x38bdf8, model: "https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf" },
+      studio_clean: { bg: 0x0d0f14, fog: 0x0d0f14, key: 0xffffff, rim: 0x818cf8, model: "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb" }
+    };
+    const theme = presets[data.atmosphere] || presets.cyber_neon;
+    scene.background = new THREE.Color(theme.bg);
+    scene.fog = new THREE.FogExp2(theme.fog, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 200);
+    camera.position.set(0, 1.8, 5.2);
+
+    // Post-Processing Composer + UnrealBloom
+    const composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.75, 0.45, 0.82);
+    composer.addPass(bloomPass);
+
+    // Studio 3-Point Lighting
+    const keyLight = new THREE.DirectionalLight(theme.key, 2.5);
+    keyLight.position.set(5, 10, 7);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.PointLight(theme.rim, 5, 16);
+    rimLight.position.set(-4, 3, -3);
+    scene.add(rimLight);
+
+    // Reflective Pedestal Stage (No ugly boxes)
+    const stageDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.2, 3.6, 0.25, 64),
+      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.85, roughness: 0.15 })
+    );
+    stageDisc.position.y = -1.15;
+    stageDisc.receiveShadow = true;
+    scene.add(stageDisc);
+
+    const neonHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(3.25, 0.035, 16, 100),
+      new THREE.MeshBasicMaterial({ color: theme.key })
+    );
+    neonHalo.rotation.x = Math.PI / 2;
+    neonHalo.position.y = -1.02;
+    scene.add(neonHalo);
+
+    // Floating Atmospheric Energy Particles
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(250 * 3);
+    for (let i = 0; i < 750; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 28;
+      starPos[i + 1] = -1 + Math.random() * 14;
+      starPos[i + 2] = (Math.random() - 0.5) * 28;
     }
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+    const particles = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: theme.key, size: 0.09 }));
+    scene.add(particles);
 
-    // Generate 4 Consistent 3D Pixar Style Frames with Locked Seed
-    async function loadPixarScenes() {
-      const subject = extractVisualSubject();
-      const lockedSeed = Math.abs(subject.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)) % 999999 + 1000;
-      const angles = [
-        "wide establishing cinematic shot, dramatic volumetric lighting, 3D Pixar Disney animation style, 8k, ultra detailed",
-        "medium character close-up shot, expressive face and eyes, Pixar 3D animated movie frame, soft rim light, 8k",
-        "dynamic low-angle action shot, depth of field, glowing atmosphere, Pixar 3D cinema render, 8k",
-        "emotional golden cinematic ending shot, rich textures, Pixar 3D animation masterpiece, 8k"
-      ];
+    let mixer = null;
+    let heroMesh = null;
 
-      const images = [];
-      for (let i = 0; i < angles.length; i++) {
-        statusEl.textContent = `Rendering 3D Scene ${i + 1} of 4...`;
-        progressEl.style.width = `${15 + i * 15}%`;
-        const prompt = encodeURIComponent(`${subject}, ${angles[i]}`);
-        const url = `https://image.pollinations.ai/prompt/${prompt}?width=1280&height=720&seed=${lockedSeed}&nologo=true&model=flux`;
-        const img = await loadImageSafe(url, i);
-        images.push(img);
-      }
-      return images;
-    }
-
-    function loadImageSafe(url, idx) {
+    function loadHeroAsset() {
       return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        const timer = setTimeout(() => resolve(createFallbackFrame(idx)), 14000);
-        img.onload = () => { clearTimeout(timer); resolve(img); };
-        img.onerror = () => { clearTimeout(timer); resolve(createFallbackFrame(idx)); };
-        img.src = url;
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+          theme.model,
+          (gltf) => {
+            heroMesh = gltf.scene;
+            const box = new THREE.Box3().setFromObject(heroMesh);
+            const size = box.getSize(new THREE.Vector3()).length();
+            const scale = 2.6 / (size || 1);
+            heroMesh.scale.setScalar(scale);
+
+            const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scale);
+            heroMesh.position.set(-center.x, -box.min.y * scale - 1.0, -center.z);
+
+            heroMesh.traverse(c => {
+              if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+              }
+            });
+            scene.add(heroMesh);
+
+            if (gltf.animations && gltf.animations.length > 0) {
+              mixer = new THREE.AnimationMixer(heroMesh);
+              const clip = THREE.AnimationClip.findByName(gltf.animations, "Walking") ||
+                           THREE.AnimationClip.findByName(gltf.animations, "Dance") ||
+                           gltf.animations[0];
+              mixer.clipAction(clip).play();
+            }
+            resolve();
+          },
+          undefined,
+          () => {
+            // Smooth TorusKnot Sculpture fallback if offline
+            heroMesh = new THREE.Mesh(
+              new THREE.TorusKnotGeometry(0.85, 0.28, 128, 32),
+              new THREE.MeshStandardMaterial({ color: theme.key, metalness: 0.9, roughness: 0.1 })
+            );
+            heroMesh.position.y = 0.3;
+            scene.add(heroMesh);
+            resolve();
+          }
+        );
       });
     }
 
-    function createFallbackFrame(idx) {
-      const c = document.createElement("canvas");
-      c.width = 1280; c.height = 720;
-      const g = c.getContext("2d");
-      const grad = g.createRadialGradient(640, 360, 60, 640, 360, 720);
-      const palettes = [["#1e1b4b", "#09090b"], ["#064e3b", "#09090b"], ["#4c0519", "#09090b"], ["#172554", "#09090b"]];
-      grad.addColorStop(0, palettes[idx % 4][0]);
-      grad.addColorStop(1, palettes[idx % 4][1]);
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 1280, 720);
-      return c;
-    }
-
-    // Procedural Realistic Human Breath & Cough SFX via Web Audio API
+    // 2. Natural Human Breath & Cough SFX + Neural Voice Audio Engine
     function playNaturalBreath(ctx, dest, time, isCough = false) {
       const dur = isCough ? 0.32 : 0.48;
       const bufSize = Math.floor(ctx.sampleRate * dur);
@@ -229,7 +304,6 @@
       noise.start(time);
     }
 
-    // Fetch Neural TTS Audio Buffer so it records cleanly into video
     async function fetchVoiceBuffer(ctx, text) {
       const clean = text.replace(/\[breath\]|\[cough\]|\[sigh\]/gi, "").trim();
       if (!clean) return null;
@@ -250,31 +324,34 @@
       return null;
     }
 
-    async function buildAndRecordMovie() {
-      const scenes = await loadPixarScenes();
-      statusEl.textContent = "Recording Natural Voice & Cinema Video...";
-      progressEl.style.width = "75%";
+    async function startCinemaProduction() {
+      await loadHeroAsset();
+
+      if (data.code && data.code.trim().length > 25) {
+        try {
+          const runCustom = new Function("scene", "camera", "renderer", "THREE", data.code);
+          runCustom(scene, camera, renderer, THREE);
+        } catch (e) {}
+      }
 
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       const audioCtx = new AudioCtx();
       if (audioCtx.state === "suspended") await audioCtx.resume();
       const audioDest = audioCtx.createMediaStreamDestination();
 
-      // Subtle Cinematic Ambient Pad
+      // Subtle Ambient Cinema Drone
       const osc = audioCtx.createOscillator();
       const padGain = audioCtx.createGain();
       osc.type = "sine";
-      osc.frequency.value = 110;
+      osc.frequency.value = 98;
       padGain.gain.value = 0.025;
       osc.connect(padGain);
       padGain.connect(audioDest);
       osc.start();
 
-      // Split narration into natural phrases with breath/cough cues
       const rawNarration = (data.narration || "").trim();
       const parts = rawNarration.split(/(\[breath\]|\[cough\]|\[sigh\]|[।!?.,]+)/i).filter(p => p && p.trim());
-      let scheduleTime = audioCtx.currentTime + 0.3;
-      let totalAudioDuration = 0;
+      let scheduleTime = audioCtx.currentTime + 0.25;
 
       for (const part of parts) {
         const lower = part.toLowerCase().trim();
@@ -285,9 +362,8 @@
           playNaturalBreath(audioCtx, audioDest, scheduleTime, false);
           scheduleTime += 0.5;
         } else if (/^[।!?.,]+$/.test(lower)) {
-          // Natural breath pause at sentence end
           playNaturalBreath(audioCtx, audioDest, scheduleTime, false);
-          scheduleTime += 0.38;
+          scheduleTime += 0.35;
         } else {
           const buf = await fetchVoiceBuffer(audioCtx, part);
           if (buf) {
@@ -296,15 +372,14 @@
             src.connect(audioDest);
             src.connect(audioCtx.destination);
             src.start(scheduleTime);
-            scheduleTime += buf.duration + 0.12;
+            scheduleTime += buf.duration + 0.1;
           }
         }
       }
-      totalAudioDuration = Math.max(12000, Math.min(25000, (scheduleTime - audioCtx.currentTime + 0.8) * 1000));
 
-      // Combine Canvas Video Stream + Mixed Audio Stream
-      const canvas = document.getElementById("stageCanvas");
-      const ctx2d = canvas.getContext("2d");
+      const DURATION = Math.max(12000, Math.min(22000, (scheduleTime - audioCtx.currentTime + 0.8) * 1000));
+
+      const canvas = renderer.domElement;
       const videoStream = canvas.captureStream(30);
       const combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
@@ -314,7 +389,7 @@
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
         ? "video/webm;codecs=vp9,opus"
         : "video/webm";
-      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 5000000 });
+      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 6000000 });
       const chunks = [];
 
       recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
@@ -323,7 +398,7 @@
         const blob = new Blob(chunks, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
 
-        document.getElementById("loaderOverlay").style.display = "none";
+        document.getElementById("hudOverlay").style.display = "none";
         canvas.style.display = "none";
 
         const vid = document.getElementById("finalVideo");
@@ -337,74 +412,49 @@
         downloadBtn.classList.remove("disabled");
       };
 
-      // Floating dust/sparkle particles
-      const particles = Array.from({ length: 45 }, () => ({
-        x: Math.random() * 1280,
-        y: Math.random() * 720,
-        r: 1.5 + Math.random() * 2.5,
-        vy: -0.3 - Math.random() * 0.6,
-        vx: (Math.random() - 0.5) * 0.4
-      }));
-
       const startTime = performance.now();
+      let lastTime = startTime;
       recorder.start();
 
-      function animateFrame(now) {
+      function renderLoop(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
         const elapsed = now - startTime;
-        const progress = Math.min(1, elapsed / totalAudioDuration);
-        progressEl.style.width = `${75 + Math.floor(progress * 25)}%`;
+        const progress = Math.min(1, elapsed / DURATION);
+        const t = elapsed / 1000;
 
-        const sceneFloat = progress * scenes.length;
-        const idx = Math.min(scenes.length - 1, Math.floor(sceneFloat));
-        const localP = sceneFloat - idx;
-        const img = scenes[idx];
+        if (mixer) mixer.update(dt);
+        if (heroMesh && !mixer) {
+          heroMesh.rotation.y = t * 0.65;
+          heroMesh.position.y += Math.sin(t * 2.5) * 0.002;
+        }
+        particles.rotation.y = t * 0.12;
+        neonHalo.scale.setScalar(1 + Math.sin(t * 3) * 0.02);
 
-        // Smooth 3D Cinema Camera Zoom & Pan + Voice Pulse
-        const voicePulse = Math.abs(Math.sin(elapsed * 0.014)) * 0.012;
-        const scale = 1.04 + localP * 0.1 + voicePulse;
-        const panX = (idx % 2 === 0 ? -1 : 1) * (localP - 0.5) * 45;
-        const panY = Math.sin(localP * Math.PI) * -15;
-
-        ctx2d.fillStyle = "#000";
-        ctx2d.fillRect(0, 0, 1280, 720);
-
-        ctx2d.save();
-        ctx2d.translate(640 + panX, 360 + panY);
-        ctx2d.scale(scale, scale);
-        ctx2d.drawImage(img, -640, -360, 1280, 720);
-        ctx2d.restore();
-
-        // Atmospheric Particles
-        ctx2d.fillStyle = "rgba(255, 245, 200, 0.55)";
-        for (const p of particles) {
-          p.x += p.vx;
-          p.y += p.vy;
-          if (p.y < 0) p.y = 720;
-          if (p.x < 0) p.x = 1280;
-          if (p.x > 1280) p.x = 0;
-          ctx2d.beginPath();
-          ctx2d.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx2d.fill();
+        if (typeof window.animateScene === "function") {
+          try { window.animateScene(t, progress); } catch (e) {}
+        } else {
+          const angle = progress * Math.PI * 1.6 - 0.8;
+          camera.position.set(Math.sin(angle) * 4.6, 1.35 + Math.sin(t * 0.9) * 0.25, Math.cos(angle) * 4.6);
+          camera.lookAt(0, 0.2, 0);
         }
 
-        // Subtle Cinema Vignette
-        const vig = ctx2d.createRadialGradient(640, 360, 380, 640, 360, 760);
-        vig.addColorStop(0, "rgba(0,0,0,0)");
-        vig.addColorStop(1, "rgba(0,0,0,0.45)");
-        ctx2d.fillStyle = vig;
-        ctx2d.fillRect(0, 0, 1280, 720);
+        composer.render();
+
+        progressEl.style.width = Math.floor(progress * 100) + "%";
+        timerEl.textContent = Math.max(0, Math.ceil((DURATION - elapsed) / 1000)) + "s";
 
         if (progress < 1) {
-          requestAnimationFrame(animateFrame);
+          requestAnimationFrame(renderLoop);
         } else {
           recorder.stop();
         }
       }
 
-      requestAnimationFrame(animateFrame);
+      requestAnimationFrame(renderLoop);
     }
 
-    buildAndRecordMovie();
+    startCinemaProduction();
   </script>
 </body>
 </html>
