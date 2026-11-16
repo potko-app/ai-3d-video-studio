@@ -3,259 +3,283 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kinetra3D — Live Studio</title>
-  <!-- Three.js और आवश्यक 3D लाइब्रेरीज़ -->
+  <title>Kinetra3D — Real 3D Video Studio</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
-    :root {
-      --bg: #09090B;
-      --card: #131316;
-      --border: #27272A;
-      --accent: #6366F1;
-      --text: #F8FAFC;
-      --text-muted: #94A3B8;
-    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: var(--bg);
-      color: var(--text);
+      background: #09090b;
+      color: #f8fafc;
       font-family: system-ui, -apple-system, sans-serif;
       padding: 16px;
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
       min-height: 100vh;
     }
-    .container {
+    .box {
       width: 100%;
-      max-width: 600px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      margin-top: 20px;
+      max-width: 640px;
+      background: #131316;
+      border: 1px solid #27272a;
+      border-radius: 14px;
+      padding: 18px;
+      height: fit-content;
     }
-    h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; text-align: center; }
-    p { font-size: 14px; color: var(--text-muted); text-align: center; margin-bottom: 20px; }
-    
-    /* Simple 3D Canvas / Player Box */
-    #canvas-container {
+    h1 { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 16px; line-height: 1.4; }
+    .stage {
       width: 100%;
       aspect-ratio: 16/9;
       background: #000;
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
       position: relative;
-      border: 1px solid var(--border);
+      border: 1px solid #27272a;
     }
-    canvas { width: 100%; height: 100%; display: block; }
-    
-    .status-hud {
+    canvas, video { width: 100%; height: 100%; display: block; object-fit: cover; }
+    video { display: none; }
+    .hud {
       position: absolute;
-      bottom: 12px;
-      left: 12px;
-      right: 12px;
-      background: rgba(0,0,0,0.8);
-      border: 1px solid rgba(255,255,255,0.1);
-      padding: 8px 12px;
-      border-radius: 6px;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(9, 9, 11, 0.85);
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 10px 12px;
+      border-radius: 8px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 12px;
     }
-    .progress-bar {
-      height: 4px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 2px;
-      margin-top: 6px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--accent);
-      transition: width 0.3s;
-    }
-    
+    .bar { width: 140px; height: 5px; background: #27272a; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+    .fill { height: 100%; width: 0%; background: #6366f1; transition: width 0.15s linear; }
+    .actions { display: flex; gap: 10px; margin-top: 14px; }
     .btn {
-      width: 100%;
+      flex: 1;
       padding: 12px;
-      background: var(--accent);
-      color: white;
       border: none;
       border-radius: 8px;
       font-weight: 600;
-      cursor: pointer;
-      margin-top: 16px;
       font-size: 14px;
-      transition: opacity 0.2s;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
     }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .hidden { display: none !important; }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary.disabled { background: #27272a; color: #71717a; pointer-events: none; }
+    .btn-secondary { background: #1e1e24; color: #e2e8f0; border: 1px solid #3f3f46; }
   </style>
 </head>
 <body>
+  <div class="box">
+    <h1 id="videoTitle">Kinetra3D Live Render Engine</h1>
+    <p id="narrationText" class="sub">Preparing 3D scene & video recorder...</p>
 
-  <div class="container">
-    <h1>Kinetra3D Live Player</h1>
-    <p id="description">Initializing local rendering engine...</p>
-
-    <div id="canvas-container">
-      <div id="statusHud" class="status-hud">
+    <div class="stage" id="stage">
+      <video id="recordedVideo" controls playsinline loop></video>
+      <div class="hud" id="hud">
         <div>
-          <span id="statusLabel" style="font-weight:600;">Building 3D Scene...</span>
-          <div class="progress-bar" style="width: 150px;"><div id="progressBar" class="progress-fill"></div></div>
+          <span id="statusText">🔴 Recording 3D Video...</span>
+          <div class="bar"><div class="fill" id="progressFill"></div></div>
         </div>
-        <div id="timeLabel" style="color:var(--text-muted);">15s left</div>
+        <span id="timerText">15s</span>
       </div>
     </div>
 
-    <button id="downloadBtn" class="btn" disabled>Download 3D Video (MP4)</button>
+    <div class="actions">
+      <a id="downloadLink" class="btn btn-primary disabled" download="kinetra3d-video.webm">⏳ Recording Video...</a>
+      <button id="voiceBtn" class="btn btn-secondary">🔊 Play Voice</button>
+    </div>
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const vidId = params.get("v") || "demo";
-    
-    const statusLabel = document.getElementById("statusLabel");
-    const progressBar = document.getElementById("progressBar");
-    const timeLabel = document.getElementById("timeLabel");
-    const description = document.getElementById("description");
-    const downloadBtn = document.getElementById("downloadBtn");
+    function b64DecodeUnicode(str) {
+      return decodeURIComponent(atob(str).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+    }
 
-    // 1. Basic Three.js Scene Setup (बिना सर्वर लोड के हाई-क्वालिटी 3D)
-    const container = document.getElementById("canvas-container");
+    let sceneData = {
+      title: "Magical Forest Robot (Demo)",
+      narration: "वाह! इस जादुई जंगल में यह चमकता हुआ नीला फूल कितना सुंदर है!",
+      code: ""
+    };
+
+    try {
+      const hash = window.location.hash;
+      if (hash.startsWith("#scene=")) {
+        const decoded = JSON.parse(b64DecodeUnicode(hash.replace("#scene=", "")));
+        if (decoded) sceneData = { ...sceneData, ...decoded };
+      }
+    } catch (e) { console.error("Scene parse error:", e); }
+
+    document.getElementById("videoTitle").textContent = sceneData.title;
+    document.getElementById("narrationText").textContent = sceneData.narration || "3D Animation";
+
+    const stage = document.getElementById("stage");
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x09090b);
-    scene.fog = new THREE.FogExp2(0x09090b, 0.05);
+    scene.background = new THREE.Color(0x070913);
+    scene.fog = new THREE.FogExp2(0x070913, 0.035);
 
-    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-    camera.position.set(0, 3, 10);
+    const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 200);
+    camera.position.set(0, 3.5, 9);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(1280, 720);
     renderer.shadowMap.enabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-    container.appendChild(renderer.domElement);
+    renderer.toneMappingExposure = 1.25;
+    stage.insertBefore(renderer.domElement, stage.firstChild);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    // Base Cinematic Lighting
+    scene.add(new THREE.AmbientLight(0x3b4269, 1.2));
+    const dirLight = new THREE.DirectionalLight(0xa5b4fc, 2.2);
+    dirLight.position.set(6, 12, 8);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
 
-    // cinematic Lights (सिनेमैटिक रोशनी)
-    const ambientLight = new THREE.AmbientLight(0x0c0c0f);
-    scene.add(ambientLight);
+    // Default Rich Scene Fallback if no custom code passed
+    function buildDefaultScene() {
+      const ground = new THREE.Mesh(
+        new THREE.CircleGeometry(25, 48),
+        new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
 
-    const mainLight = new THREE.DirectionalLight(0x6366f1, 2.0);
-    mainLight.position.set(5, 10, 7);
-    mainLight.castShadow = true;
-    scene.add(mainLight);
+      const crystalColors = [0x38bdf8, 0xf472b6, 0xa855f7, 0x34d399, 0xfbbf24];
+      for (let i = 0; i < 20; i++) {
+        const c = crystalColors[i % crystalColors.length];
+        const crystal = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.35 + Math.random() * 0.5),
+          new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7, roughness: 0.2 })
+        );
+        const angle = (i / 20) * Math.PI * 2;
+        const radius = 3.5 + Math.random() * 6;
+        crystal.position.set(Math.cos(angle) * radius, 0.4, Math.sin(angle) * radius);
+        scene.add(crystal);
+      }
 
-    const pointLight = new THREE.PointLight(0x3b82f6, 4, 10);
-    pointLight.position.set(0, 2, 0);
-    scene.add(pointLight);
+      const flowerLight = new THREE.PointLight(0x38bdf8, 5, 12);
+      flowerLight.position.set(0, 1.2, -1.5);
+      scene.add(flowerLight);
 
-    // 2. 3D Elements Creation (3D वस्तुएँ बनाना)
-    // Ground
-    const groundGeo = new THREE.PlaneGeometry(50, 50);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.9 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+      const flower = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.35, 0.12, 64, 12),
+        new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x0284c7, emissiveIntensity: 2.2 })
+      );
+      flower.position.set(0, 0.9, -1.5);
+      scene.add(flower);
 
-    // Forest Rocks & Foliage (पहाड़ और जंगल)
-    const forestGroup = new THREE.Group();
-    for (let i = 0; i < 30; i++) {
-      const size = 0.5 + Math.random() * 1.5;
-      const geo = new THREE.DodecahedronGeometry(size);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.8 });
-      const rock = new THREE.Mesh(geo, mat);
-      rock.position.set((Math.random() - 0.5) * 30, size / 2, (Math.random() - 0.5) * 30);
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      forestGroup.add(rock);
-    }
-    scene.add(forestGroup);
+      const robot = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.4, roughness: 0.2 });
+      const blueMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8, emissiveIntensity: 0.8 });
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 0.9, 20), bodyMat);
+      torso.position.y = 0.85;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), bodyMat);
+      head.position.y = 1.65;
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), blueMat);
+      eyeL.position.set(-0.16, 1.68, 0.39);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.16;
+      robot.add(torso, head, eyeL, eyeR);
+      scene.add(robot);
 
-    // Magical Bioluminescent Flower (चमकता हुआ फूल)
-    const flowerGeo = new THREE.ConeGeometry(0.2, 0.8, 4);
-    const flowerMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x3b82f6, emissiveIntensity: 2 });
-    const flower = new THREE.Mesh(flowerGeo, flowerMat);
-    flower.position.set(0, 0.4, -2);
-    scene.add(flower);
+      // Fireflies
+      const pGeo = new THREE.BufferGeometry();
+      const pPos = new Float32Array(120 * 3);
+      for (let i = 0; i < 360; i++) pPos[i] = (Math.random() - 0.5) * 18;
+      pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+      const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xfef08a, size: 0.12 }));
+      scene.add(particles);
 
-    // Robot (कार्टून रोबोट)
-    const robot = new THREE.Group();
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xe4e4e7, roughness: 0.2 }));
-    head.position.y = 1.1;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0x3f3f46 }));
-    body.position.y = 0.5;
-    robot.add(head, body);
-    scene.add(robot);
-
-    // 3. Simple Rendering Progress Animation (आधे फ्रेम और लाइव प्रगति)
-    let frame = 0;
-    const maxFrames = 225; // 15 seconds @ 15fps
-    let renderInterval;
-
-    description.textContent = `A tiny cute robot exploring a bioluminescent forest, finding a magical glowing flower. Job: ${vidId}`;
-
-    function startSceneRender() {
-      renderInterval = setInterval(() => {
-        frame++;
-        const pct = Math.floor((frame / maxFrames) * 100);
-        
-        progressBar.style.width = `${pct}%`;
-        statusLabel.textContent = `Rendering frame: ${frame} / ${maxFrames}`;
-        timeLabel.textContent = `${Math.ceil((maxFrames - frame) / 15)}s left`;
-
-        // Animate Camera & Robot (कैरेक्टर और कैमरा मूवमेंट)
-        robot.position.z = THREE.MathUtils.lerp(3, -1.5, frame / maxFrames);
-        robot.position.y = Math.abs(Math.sin(frame * 0.15)) * 0.1; // Bobbing effect (चलना)
-        camera.position.x = Math.sin(frame * 0.01) * 10;
-        camera.position.z = Math.cos(frame * 0.01) * 10;
-        camera.lookAt(robot.position);
-
-        renderer.render(scene, camera);
-
-        if (frame >= maxFrames) {
-          clearInterval(renderInterval);
-          finishRender();
-        }
-      }, 66); // ~15 FPS
+      window.animateScene = function(t, p) {
+        flower.rotation.y = t * 2;
+        flower.scale.setScalar(1 + Math.sin(t * 4) * 0.12);
+        robot.position.z = THREE.MathUtils.lerp(3.5, 0.2, Math.min(1, p * 1.3));
+        robot.position.y = Math.abs(Math.sin(t * 8)) * 0.12;
+        particles.rotation.y = t * 0.15;
+        camera.position.x = Math.sin(p * Math.PI * 2) * 7.5;
+        camera.position.z = Math.cos(p * Math.PI * 2) * 7.5;
+        camera.lookAt(0, 1.1, 0);
+      };
     }
 
-    function finishRender() {
-      statusLabel.textContent = "✓ Completed";
-      progressBar.style.width = "100%";
-      timeLabel.textContent = "0s";
-      description.textContent = "Your video has been rendered and compiles successfully with local GPU & AI Voice.";
-      downloadBtn.disabled = false;
-      
-      // AI Voice play placeholder (आवाज बजाने की टेस्टिंग)
-      const utterance = new SpeechSynthesisUtterance("वाह! इस जादुई दुनिया में... यह चमकता हुआ फूल कितना सुंदर है!");
-      utterance.lang = "hi-IN";
-      window.speechSynthesis.speak(utterance);
+    if (sceneData.code && sceneData.code.trim().length > 10) {
+      try {
+        const runCustom = new Function("scene", "camera", "renderer", "THREE", sceneData.code);
+        runCustom(scene, camera, renderer, THREE);
+      } catch (err) {
+        console.error("Custom scene error, using default:", err);
+        buildDefaultScene();
+      }
+    } else {
+      buildDefaultScene();
     }
 
-    startSceneRender();
+    // Real MediaRecorder Video Capture
+    const canvas = renderer.domElement;
+    const stream = canvas.captureStream(30);
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+    const chunks = [];
 
-    // Resize Handler
-    window.addEventListener('resize', () => {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-    });
+    recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: "video/webm" });
+      const videoUrl = URL.createObjectURL(blob);
 
-    // Dummy Download
-    downloadBtn.addEventListener('click', () => {
-      alert("Downloading of MP4 from local client WebGL Canvas starts shortly!");
-    });
+      canvas.style.display = "none";
+      document.getElementById("hud").style.display = "none";
+
+      const vidEl = document.getElementById("recordedVideo");
+      vidEl.src = videoUrl;
+      vidEl.style.display = "block";
+      vidEl.play().catch(() => {});
+
+      const dl = document.getElementById("downloadLink");
+      dl.href = videoUrl;
+      dl.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ".webm";
+      dl.textContent = "⬇️ Download Real Video";
+      dl.classList.remove("disabled");
+    };
+
+    function speakNarration() {
+      if (!sceneData.narration || !("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(sceneData.narration);
+      u.lang = /[\u0900-\u097F]/.test(sceneData.narration) ? "hi-IN" : "en-US";
+      window.speechSynthesis.speak(u);
+    }
+
+    document.getElementById("voiceBtn").addEventListener("click", speakNarration);
+
+    const DURATION = 15000; // 15 seconds
+    const startTime = performance.now();
+    recorder.start();
+    speakNarration();
+
+    function renderLoop(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / DURATION);
+      const t = elapsed / 1000;
+
+      if (typeof window.animateScene === "function") {
+        try { window.animateScene(t, progress); } catch (e) {}
+      }
+      renderer.render(scene, camera);
+
+      document.getElementById("progressFill").style.width = Math.floor(progress * 100) + "%";
+      document.getElementById("timerText").textContent = Math.max(0, Math.ceil((DURATION - elapsed) / 1000)) + "s";
+
+      if (progress < 1) {
+        requestAnimationFrame(renderLoop);
+      } else {
+        recorder.stop();
+      }
+    }
+    requestAnimationFrame(renderLoop);
   </script>
 </body>
 </html>
