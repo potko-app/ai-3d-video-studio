@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kinetra3D — Real 3D Video Studio</title>
+  <title>Kinetra3D — Public 3D Animation Studio</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,15 +18,15 @@
     }
     .box {
       width: 100%;
-      max-width: 640px;
-      background: #131316;
+      max-width: 680px;
+      background: #121216;
       border: 1px solid #27272a;
       border-radius: 14px;
       padding: 18px;
       height: fit-content;
     }
     h1 { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 6px; }
-    .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 16px; line-height: 1.4; }
+    .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 16px; line-height: 1.45; }
     .stage {
       width: 100%;
       aspect-ratio: 16/9;
@@ -43,7 +43,7 @@
       bottom: 10px;
       left: 10px;
       right: 10px;
-      background: rgba(9, 9, 11, 0.85);
+      background: rgba(9, 9, 11, 0.88);
       border: 1px solid rgba(255,255,255,0.12);
       padding: 10px 12px;
       border-radius: 8px;
@@ -52,36 +52,35 @@
       align-items: center;
       font-size: 12px;
     }
-    .bar { width: 140px; height: 5px; background: #27272a; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+    .bar { width: 150px; height: 5px; background: #27272a; border-radius: 3px; margin-top: 5px; overflow: hidden; }
     .fill { height: 100%; width: 0%; background: #6366f1; transition: width 0.15s linear; }
-    .actions { display: flex; gap: 10px; margin-top: 14px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
     .btn {
-      flex: 1;
       padding: 12px;
       border: none;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       text-align: center;
       text-decoration: none;
       display: inline-block;
     }
-    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary { background: #6366f1; color: #fff; grid-column: span 2; font-size: 14px; }
     .btn-primary.disabled { background: #27272a; color: #71717a; pointer-events: none; }
-    .btn-secondary { background: #1e1e24; color: #e2e8f0; border: 1px solid #3f3f46; }
+    .btn-secondary { background: #1c1c22; color: #e2e8f0; border: 1px solid #3f3f46; }
   </style>
 </head>
 <body>
   <div class="box">
-    <h1 id="videoTitle">Kinetra3D Live Render Engine</h1>
-    <p id="narrationText" class="sub">Preparing 3D scene & video recorder...</p>
+    <h1 id="videoTitle">Kinetra3D Studio</h1>
+    <p id="narrationText" class="sub">Initializing 3D Render Engine...</p>
 
     <div class="stage" id="stage">
       <video id="recordedVideo" controls playsinline loop></video>
       <div class="hud" id="hud">
         <div>
-          <span id="statusText">🔴 Recording 3D Video...</span>
+          <span id="statusText">🔴 Rendering & Recording 3D Video...</span>
           <div class="bar"><div class="fill" id="progressFill"></div></div>
         </div>
         <span id="timerText">15s</span>
@@ -89,8 +88,9 @@
     </div>
 
     <div class="actions">
-      <a id="downloadLink" class="btn btn-primary disabled" download="kinetra3d-video.webm">⏳ Recording Video...</a>
-      <button id="voiceBtn" class="btn btn-secondary">🔊 Play Voice</button>
+      <a id="downloadLink" class="btn btn-primary disabled" download="kinetra3d-video.webm">⏳ Recording Video (15s)...</a>
+      <button id="voiceBtn" class="btn btn-secondary">🔊 Replay Voiceover</button>
+      <button id="blenderBtn" class="btn btn-secondary">📦 Blender Script (.py)</button>
     </div>
   </div>
 
@@ -100,9 +100,10 @@
     }
 
     let sceneData = {
-      title: "Magical Forest Robot (Demo)",
-      narration: "वाह! इस जादुई जंगल में यह चमकता हुआ नीला फूल कितना सुंदर है!",
-      code: ""
+      title: "Neon Cyber City Drive",
+      narration: "रात के इस चमकते हुए निऑन शहर में रफ़्तार और रोशनी का जादू देखिए!",
+      code: "",
+      bpy: "import bpy\nbpy.ops.mesh.primitive_monkey_add(size=2)\nbpy.ops.object.shade_smooth()"
     };
 
     try {
@@ -111,118 +112,109 @@
         const decoded = JSON.parse(b64DecodeUnicode(hash.replace("#scene=", "")));
         if (decoded) sceneData = { ...sceneData, ...decoded };
       }
-    } catch (e) { console.error("Scene parse error:", e); }
+    } catch (e) { console.error("Scene decode error:", e); }
 
     document.getElementById("videoTitle").textContent = sceneData.title;
     document.getElementById("narrationText").textContent = sceneData.narration || "3D Animation";
 
     const stage = document.getElementById("stage");
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x070913);
-    scene.fog = new THREE.FogExp2(0x070913, 0.035);
+    scene.background = new THREE.Color(0x060812);
+    scene.fog = new THREE.FogExp2(0x060812, 0.028);
 
-    const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 250);
     camera.position.set(0, 3.5, 9);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(1280, 720);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = 1.3;
     stage.insertBefore(renderer.domElement, stage.firstChild);
 
-    // Base Cinematic Lighting
-    scene.add(new THREE.AmbientLight(0x3b4269, 1.2));
-    const dirLight = new THREE.DirectionalLight(0xa5b4fc, 2.2);
-    dirLight.position.set(6, 12, 8);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
+    // Pro 3-Point Studio Lighting
+    scene.add(new THREE.HemisphereLight(0x818cf8, 0x0f172a, 1.1));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    keyLight.position.set(8, 15, 10);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.5);
+    rimLight.position.set(-8, 6, -10);
+    scene.add(rimLight);
 
-    // Default Rich Scene Fallback if no custom code passed
     function buildDefaultScene() {
-      const ground = new THREE.Mesh(
-        new THREE.CircleGeometry(25, 48),
-        new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 })
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(14, 120),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.6, roughness: 0.25 })
       );
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
-      scene.add(ground);
+      road.rotation.x = -Math.PI / 2;
+      road.receiveShadow = true;
+      scene.add(road);
 
-      const crystalColors = [0x38bdf8, 0xf472b6, 0xa855f7, 0x34d399, 0xfbbf24];
-      for (let i = 0; i < 20; i++) {
-        const c = crystalColors[i % crystalColors.length];
-        const crystal = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.35 + Math.random() * 0.5),
-          new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7, roughness: 0.2 })
+      const buildings = [];
+      const neonColors = [0x38bdf8, 0xf43f5e, 0xa855f7, 0x10b981, 0xf59e0b];
+      for (let i = 0; i < 36; i++) {
+        const h = 3 + Math.random() * 9;
+        const col = neonColors[i % neonColors.length];
+        const b = new THREE.Mesh(
+          new THREE.BoxGeometry(2.2, h, 2.2),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: col, emissiveIntensity: 0.35, roughness: 0.3 })
         );
-        const angle = (i / 20) * Math.PI * 2;
-        const radius = 3.5 + Math.random() * 6;
-        crystal.position.set(Math.cos(angle) * radius, 0.4, Math.sin(angle) * radius);
-        scene.add(crystal);
+        const side = i % 2 === 0 ? -1 : 1;
+        b.position.set(side * (5 + Math.random() * 4), h / 2, -60 + i * 3.5);
+        scene.add(b);
+        buildings.push(b);
       }
 
-      const flowerLight = new THREE.PointLight(0x38bdf8, 5, 12);
-      flowerLight.position.set(0, 1.2, -1.5);
-      scene.add(flowerLight);
-
-      const flower = new THREE.Mesh(
-        new THREE.TorusKnotGeometry(0.35, 0.12, 64, 12),
-        new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x0284c7, emissiveIntensity: 2.2 })
+      // Sleek Sports Car
+      const car = new THREE.Group();
+      const chassis = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 0.5, 3.4),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8, roughness: 0.15 })
       );
-      flower.position.set(0, 0.9, -1.5);
-      scene.add(flower);
-
-      const robot = new THREE.Group();
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.4, roughness: 0.2 });
-      const blueMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8, emissiveIntensity: 0.8 });
-      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 0.9, 20), bodyMat);
-      torso.position.y = 0.85;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), bodyMat);
-      head.position.y = 1.65;
-      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), blueMat);
-      eyeL.position.set(-0.16, 1.68, 0.39);
-      const eyeR = eyeL.clone();
-      eyeR.position.x = 0.16;
-      robot.add(torso, head, eyeL, eyeR);
-      scene.add(robot);
-
-      // Fireflies
-      const pGeo = new THREE.BufferGeometry();
-      const pPos = new Float32Array(120 * 3);
-      for (let i = 0; i < 360; i++) pPos[i] = (Math.random() - 0.5) * 18;
-      pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
-      const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xfef08a, size: 0.12 }));
-      scene.add(particles);
+      chassis.position.y = 0.5;
+      const cabin = new THREE.Mesh(
+        new THREE.BoxGeometry(1.3, 0.45, 1.7),
+        new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.1 })
+      );
+      cabin.position.set(0, 0.92, -0.2);
+      const headLightL = new THREE.Mesh(new THREE.SphereGeometry(0.14), new THREE.MeshBasicMaterial({ color: 0xe0f2fe }));
+      headLightL.position.set(-0.55, 0.52, 1.7);
+      const headLightR = headLightL.clone();
+      headLightR.position.x = 0.55;
+      car.add(chassis, cabin, headLightL, headLightR);
+      scene.add(car);
 
       window.animateScene = function(t, p) {
-        flower.rotation.y = t * 2;
-        flower.scale.setScalar(1 + Math.sin(t * 4) * 0.12);
-        robot.position.z = THREE.MathUtils.lerp(3.5, 0.2, Math.min(1, p * 1.3));
-        robot.position.y = Math.abs(Math.sin(t * 8)) * 0.12;
-        particles.rotation.y = t * 0.15;
-        camera.position.x = Math.sin(p * Math.PI * 2) * 7.5;
-        camera.position.z = Math.cos(p * Math.PI * 2) * 7.5;
-        camera.lookAt(0, 1.1, 0);
+        buildings.forEach(b => {
+          b.position.z += 0.45;
+          if (b.position.z > 20) b.position.z = -100;
+        });
+        car.position.x = Math.sin(t * 2) * 1.4;
+        car.rotation.y = Math.cos(t * 2) * 0.12;
+        camera.position.set(Math.sin(p * Math.PI * 2) * 5.5, 2.8 + Math.sin(t) * 0.4, Math.cos(p * Math.PI * 2) * 6.5);
+        camera.lookAt(car.position.x, 0.8, 0);
       };
     }
 
-    if (sceneData.code && sceneData.code.trim().length > 10) {
+    if (sceneData.code && sceneData.code.trim().length > 15) {
       try {
         const runCustom = new Function("scene", "camera", "renderer", "THREE", sceneData.code);
         runCustom(scene, camera, renderer, THREE);
       } catch (err) {
-        console.error("Custom scene error, using default:", err);
+        console.error("Fallback to default scene:", err);
         buildDefaultScene();
       }
     } else {
       buildDefaultScene();
     }
 
-    // Real MediaRecorder Video Capture
+    // Real Video Capture
     const canvas = renderer.domElement;
     const stream = canvas.captureStream(30);
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5000000 });
     const chunks = [];
 
     recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
@@ -241,7 +233,7 @@
       const dl = document.getElementById("downloadLink");
       dl.href = videoUrl;
       dl.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ".webm";
-      dl.textContent = "⬇️ Download Real Video";
+      dl.textContent = "⬇️ Download Real 3D Video";
       dl.classList.remove("disabled");
     };
 
@@ -254,8 +246,15 @@
     }
 
     document.getElementById("voiceBtn").addEventListener("click", speakNarration);
+    document.getElementById("blenderBtn").addEventListener("click", () => {
+      const blob = new Blob([sceneData.bpy || "# Blender Script"], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "kinetra3d_blender_scene.py";
+      a.click();
+    });
 
-    const DURATION = 15000; // 15 seconds
+    const DURATION = 15000;
     const startTime = performance.now();
     recorder.start();
     speakNarration();
