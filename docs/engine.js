@@ -1,7 +1,32 @@
 (function () {
   "use strict";
 
-  // 1. Safe UTF-8 & URL-Safe Base64 Payload Decoder
+  // ============================================================================
+  // 1. UNIVERSAL THREE.JS COMPATIBILITY LAYER (Prevents AI Code Crashes)
+  // ============================================================================
+  if (typeof THREE !== "undefined") {
+    if (!THREE.CapsuleGeometry) {
+      THREE.CapsuleGeometry = function (radius = 0.5, length = 1, capSegments = 8, radialSegments = 16) {
+        const points = [];
+        const halfLen = length * 0.5;
+        for (let i = 0; i <= capSegments; i++) {
+          const a = (i / capSegments) * (Math.PI * 0.5);
+          points.push(new THREE.Vector2(Math.sin(a) * radius, -halfLen - Math.cos(a) * radius));
+        }
+        for (let i = 0; i <= capSegments; i++) {
+          const a = (i / capSegments) * (Math.PI * 0.5);
+          points.push(new THREE.Vector2(Math.cos(a) * radius, halfLen + Math.sin(a) * radius));
+        }
+        const geo = new THREE.LatheGeometry(points, radialSegments);
+        geo.computeVertexNormals();
+        return geo;
+      }
+    }
+  }
+
+  // ============================================================================
+  // 2. PAYLOAD DECODER
+  // ============================================================================
   function decodePayload(raw) {
     let clean = raw.trim();
     try { clean = decodeURIComponent(clean); } catch (e) {}
@@ -13,238 +38,172 @@
     return JSON.parse(new TextDecoder("utf-8").decode(bytes));
   }
 
-  let sceneData = {
-    title: "Kinetra3D Cinema",
-    narration: "",
-    atmosphere: "studio_clean",
-    code: ""
-  };
-
+  let sceneData = { title: "Kinetra3D Cinema", narration: "", atmosphere: "studio_clean", code: "" };
   try {
-    const href = window.location.href;
-    const idx = href.indexOf("#scene=");
+    const idx = window.location.href.indexOf("#scene=");
     if (idx !== -1) {
-      const parsed = decodePayload(href.slice(idx + 7));
+      const parsed = decodePayload(window.location.href.slice(idx + 7));
       if (parsed) sceneData = { ...sceneData, ...parsed };
     }
-  } catch (err) {
-    console.error("Scene payload parse error:", err);
-  }
+  } catch (err) {}
 
-  // UI Bindings (Matches docs/index.html)
   const uiTitle = document.getElementById("uiTitle");
-  const uiBadge = document.getElementById("uiBadge");
-  const uiStatus = document.getElementById("uiStatus");
-  const uiProgress = document.getElementById("uiProgress");
-  const uiTimer = document.getElementById("uiTimer");
-  const uiDownloadBtn = document.getElementById("uiDownloadBtn");
-  const previewContainer = document.getElementById("previewContainer");
-
   if (uiTitle) uiTitle.textContent = sceneData.title || "Kinetra3D Studio";
 
-  // 2. Mathematical Keyframe & Easing Engine
-  const MathLogic = {
-    clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
-    lerp: (a, b, t) => a + (b - a) * t,
-    smoothstep: (e0, e1, x) => {
-      const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
-      return t * t * (3 - 2 * t);
-    },
-    easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
-    beat: (t, start, end) => MathLogic.smoothstep(start, end, t)
-  };
-
-  // 3. Cinema WebGL Renderer
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    preserveDrawingBuffer: true
-  });
+  // ============================================================================
+  // 3. CORE RENDERING ENGINE & AUTO-CAMERA FRAMING
+  // ============================================================================
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
   renderer.setSize(1280, 720);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputEncoding = THREE.sRGBEncoding;
-  previewContainer.insertBefore(renderer.domElement, previewContainer.firstChild);
+  document.getElementById("previewContainer").insertBefore(renderer.domElement, document.getElementById("previewContainer").firstChild);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 250);
+  const camera = new THREE.PerspectiveCamera(44, 16 / 9, 0.1, 300);
   camera.position.set(0, 2.2, 6.5);
 
   const ATMOSPHERES = {
-    cyber_neon:     { bg: 0x090d1c, key: 0x60a5fa, rim: 0xf43f5e, ground: 0x1e293b },
-    magical_forest: { bg: 0x0a1f16, key: 0x34d399, rim: 0xfbbf24, ground: 0x064e3b },
-    sunset_golden:  { bg: 0x261209, key: 0xfbbf24, rim: 0xf97316, ground: 0x451a03 },
-    space_cosmos:   { bg: 0x070714, key: 0xa78bfa, rim: 0x38bdf8, ground: 0x0f172a },
-    studio_clean:   { bg: 0x161b28, key: 0xfff8eb, rim: 0x818cf8, ground: 0x1e2536 }
+    cyber_neon:     { bg: 0x090e1f, key: 0x60a5fa, rim: 0xf43f5e, ground: 0x1e293b },
+    magical_forest: { bg: 0x0a2117, key: 0x34d399, rim: 0xfbbf24, ground: 0x064e3b },
+    sunset_golden:  { bg: 0x29130a, key: 0xfbbf24, rim: 0xf97316, ground: 0x451a03 },
+    space_cosmos:   { bg: 0x060612, key: 0xa78bfa, rim: 0x38bdf8, ground: 0x0f172a },
+    studio_clean:   { bg: 0x171c2b, key: 0xfff8eb, rim: 0x818cf8, ground: 0x1e2536 }
   };
   const theme = ATMOSPHERES[sceneData.atmosphere] || ATMOSPHERES.studio_clean;
   scene.background = new THREE.Color(theme.bg);
 
   const studioRig = new THREE.Group();
-  const hemiLight = new THREE.HemisphereLight(0xffffff, theme.ground, 0.85);
-  const keyLight = new THREE.DirectionalLight(theme.key, 1.4);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, theme.ground, 0.9);
+  const keyLight = new THREE.DirectionalLight(theme.key, 1.45);
   keyLight.position.set(6, 12, 8);
   keyLight.castShadow = true;
-  const rimLight = new THREE.PointLight(theme.rim, 1.8, 28, 2);
+  const rimLight = new THREE.PointLight(theme.rim, 1.8, 30, 2);
   rimLight.position.set(-5, 4.5, -4);
   studioRig.add(hemiLight, keyLight, rimLight);
   scene.add(studioRig);
 
-  // Sanitize AI Code so it cannot shadow our active scene/camera/renderer
   function sanitizeAICode(rawCode) {
     return rawCode
-      .replace(/(?:const|let|var)\s+scene\s*=\s*new\s+THREE\.Scene\s*\([^)]*\)\s*;?/g, "// bound to studio scene")
-      .replace(/(?:const|let|var)\s+camera\s*=\s*new\s+THREE\.PerspectiveCamera\s*\([^)]*\)\s*;?/g, "// bound to studio camera")
-      .replace(/(?:const|let|var)\s+renderer\s*=\s*new\s+THREE\.WebGLRenderer\s*\([^)]*\)\s*;?/g, "// bound to studio renderer")
+      .replace(/(?:const|let|var)\s+scene\s*=\s*new\s+THREE\.Scene\s*\([^)]*\)\s*;?/g, "")
+      .replace(/(?:const|let|var)\s+camera\s*=\s*new\s+THREE\.PerspectiveCamera\s*\([^)]*\)\s*;?/g, "")
+      .replace(/(?:const|let|var)\s+renderer\s*=\s*new\s+THREE\.WebGLRenderer\s*\([^)]*\)\s*;?/g, "")
       .replace(/document\.body\.appendChild\s*\(\s*renderer\.domElement\s*\)\s*;?/g, "")
-      .replace(/renderer\.setSize\s*\([^)]*\)\s*;?/g, "");
+      .replace(/requestAnimationFrame\s*\([^)]*\)\s*;?/g, "");
   }
 
-  function countSceneMeshes() {
-    let count = 0;
-    scene.traverse((obj) => { if (obj.isMesh) count++; });
-    return count;
-  }
+  function calibrateSceneAndCamera(hasCustomAnimation) {
+    let customLights = 0;
+    let meshCount = 0;
+    const worldBox = new THREE.Box3();
 
-  // Contrast & Anti-Whiteout Protection Pass
-  function enforceVisualContrast() {
-    if (scene.background && scene.background.isColor) {
-      const bgLum = 0.2126 * scene.background.r + 0.7152 * scene.background.g + 0.0722 * scene.background.b;
-      if (bgLum > 0.45) scene.background.setHex(theme.bg);
-    } else {
-      scene.background = new THREE.Color(theme.bg);
+    if (scene.background && scene.background.isColor && (0.2126 * scene.background.r + 0.7152 * scene.background.g + 0.0722 * scene.background.b > 0.5)) {
+      scene.background.setHex(theme.bg);
     }
 
-    let customLights = 0;
     scene.traverse((node) => {
       if (node.isLight && node.parent !== studioRig) {
         customLights++;
         if (node.intensity > 1.4) node.intensity = 1.25;
       }
-      if (node.isMesh && node.material) {
-        const mats = Array.isArray(node.material) ? node.material : [node.material];
-        mats.forEach((m, idx) => {
-          if (m.color) {
-            const lum = 0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b;
-            if (lum > 0.82) m.color.multiplyScalar(0.82 / lum);
-          }
-          if (m.isMeshBasicMaterial && !m.map) {
-            const shaded = new THREE.MeshStandardMaterial({
-              color: m.color || 0xcccccc,
-              roughness: 0.45,
-              metalness: 0.1,
-              transparent: m.transparent,
-              opacity: m.opacity
-            });
-            if (Array.isArray(node.material)) node.material[idx] = shaded;
-            else node.material = shaded;
-          }
-        });
+      if (node.isMesh) {
+        meshCount++;
+        worldBox.expandByObject(node);
+        if (node.material) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach(m => {
+            if (m.color && (0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b > 0.84)) m.color.multiplyScalar(0.8);
+            if (m.isMeshBasicMaterial && !m.map) {
+              const shaded = new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.45, metalness: 0.1 });
+              node.material = shaded;
+            }
+          });
+        }
       }
     });
 
-    if (customLights > 0) {
-      keyLight.intensity = 0.7;
-      hemiLight.intensity = 0.4;
+    if (customLights > 0) { keyLight.intensity = 0.6; hemiLight.intensity = 0.4; }
+
+    // Dynamic Cinematic Framing (If AI didn't animate)
+    if (!hasCustomAnimation && meshCount > 0 && !worldBox.isEmpty()) {
+      const center = worldBox.getCenter(new THREE.Vector3());
+      const size = worldBox.getSize(new THREE.Vector3()).length();
+      const dist = Math.max(4.5, Math.min(15, size * 1.3));
+      window.animateScene = function (t, p) {
+        const angle = p * Math.PI * 1.1 - 0.55;
+        camera.position.set(center.x + Math.sin(angle) * dist, center.y + dist * 0.3 + Math.sin(t * 1.2) * 0.2, center.z + Math.cos(angle) * dist);
+        camera.lookAt(center);
+      };
     }
+    return meshCount;
   }
 
-  // 4. Built-in Blender-Style Artist Toolkit (Studio.*)
+  // ============================================================================
+  // 4. STUDIO TOOLKIT (Exposed to AI for building characters/shapes)
+  // ============================================================================
   const animatedCharacters = [];
   const Studio = {
-    Math: MathLogic,
-    paint(colorHex, finish = "standard") {
-      const c = new THREE.Color(colorHex);
+    paint: (cHex, finish = "standard") => {
+      const c = new THREE.Color(cHex);
       if (finish === "glossy") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1 });
-      if (finish === "metal") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.22, metalness: 0.88 });
-      if (finish === "matte") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.02 });
-      if (finish === "neon") return new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.85, roughness: 0.3 });
+      if (finish === "metal") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.2, metalness: 0.85 });
+      if (finish === "neon") return new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.3 });
       return new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.12 });
     },
     createTextTexture(text, opts = {}) {
-      const canvas = document.createElement("canvas");
-      canvas.width = opts.width || 512;
-      canvas.height = opts.height || 256;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = opts.bg || "#1e293b";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (opts.border) {
-        ctx.strokeStyle = opts.border;
-        ctx.lineWidth = 10;
-        ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
-      }
+      const cvs = document.createElement("canvas");
+      cvs.width = opts.width || 512; cvs.height = opts.height || 256;
+      const ctx = cvs.getContext("2d");
+      ctx.fillStyle = opts.bg || "#1e293b"; ctx.fillRect(0, 0, cvs.width, cvs.height);
       ctx.fillStyle = opts.color || "#ffffff";
-      ctx.font = `bold ${opts.fontSize || 48}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      ctx.font = `bold ${opts.fontSize || 48}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const lines = String(text).split("\n");
       const lh = (opts.fontSize || 48) * 1.25;
-      const startY = canvas.height / 2 - ((lines.length - 1) * lh) / 2;
-      lines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, startY + i * lh));
-      const tex = new THREE.CanvasTexture(canvas);
+      const startY = cvs.height / 2 - ((lines.length - 1) * lh) / 2;
+      lines.forEach((line, i) => ctx.fillText(line, cvs.width / 2, startY + i * lh));
+      const tex = new THREE.CanvasTexture(cvs);
       tex.encoding = THREE.sRGBEncoding;
       return tex;
     },
-    label(targetMesh, text, opts = {}) {
-      const tex = Studio.createTextTexture(text, opts);
-      const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(opts.w || 1.2, opts.h || 0.5),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true })
-      );
-      plane.position.set(opts.x || 0, opts.y || 0, opts.z || 0.52);
-      targetMesh.add(plane);
-      return plane;
-    },
-    lathe(profilePoints, segments = 48, material = null) {
-      const pts = profilePoints.map(([x, y]) => new THREE.Vector2(x, y));
-      const geo = new THREE.LatheGeometry(pts, segments);
-      geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, material || Studio.paint(0x6366f1, "glossy"));
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      return mesh;
+    label: (target, text, opts = {}) => {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(opts.w || 1.2, opts.h || 0.5), new THREE.MeshBasicMaterial({ map: Studio.createTextTexture(text, opts), transparent: true }));
+      p.position.set(opts.x || 0, opts.y || 0, opts.z || 0.52);
+      target.add(p);
     },
     character(opts = {}) {
       const root = new THREE.Group();
       const bodyGroup = new THREE.Group();
       root.add(bodyGroup);
       const mat = Studio.paint(opts.color || 0x3b82f6, opts.finish || "glossy");
-      const bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.52, 32, 32), mat);
-      bodyMesh.scale.set(1, opts.tall ? 1.35 : 1.05, 0.92);
-      bodyMesh.position.y = 0.55;
-      bodyMesh.castShadow = true;
-      bodyGroup.add(bodyMesh);
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.4, 8, 16), mat);
+      body.position.y = 0.65; body.castShadow = true;
+      bodyGroup.add(body);
 
-      const eyeWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
-      const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), eyeWhite);
-      leftEye.position.set(-0.18, 0.65, 0.46);
-      const rightEye = leftEye.clone();
-      rightEye.position.x = 0.18;
-      const lp = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), pupilMat);
-      lp.position.z = 0.08;
-      leftEye.add(lp);
-      rightEye.add(lp.clone());
-      bodyGroup.add(leftEye, rightEye);
+      const ew = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const pw = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const le = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), ew);
+      le.position.set(-0.18, 0.8, 0.4);
+      const re = le.clone(); re.position.x = 0.18;
+      const lp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), pw);
+      lp.position.z = 0.1; le.add(lp); re.add(lp.clone());
+      bodyGroup.add(le, re);
 
       const mouthPivot = new THREE.Group();
-      mouthPivot.position.set(0, 0.42, 0.49);
-      mouthPivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.05), new THREE.MeshBasicMaterial({ color: 0x1e1b4b })));
+      mouthPivot.position.set(0, 0.55, 0.45);
+      mouthPivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0x111111 })));
       bodyGroup.add(mouthPivot);
 
-      if (opts.name) {
-        Studio.label(bodyGroup, opts.name, { w: 0.75, h: 0.26, y: 0.2, z: 0.5, bg: "rgba(0,0,0,0.7)", color: "#ffffff", fontSize: 44 });
-      }
+      if (opts.name) Studio.label(bodyGroup, opts.name, { w: 0.8, h: 0.25, y: 0.25, z: 0.48, bg: "rgba(0,0,0,0.7)" });
 
       const rig = {
-        root, bodyGroup, leftEye, rightEye, mouthPivot,
+        root, leftEye: le, rightEye: re, mouthPivot,
         speaking: opts.speaking !== false,
-        phase: Math.random() * Math.PI * 2,
-        bounce(t, speed = 4, height = 0.12) {
-          const s = Math.abs(Math.sin(t * speed + rig.phase));
-          bodyGroup.position.y = s * height;
-        }
+        phase: Math.random() * Math.PI,
+        bounce: (t, speed = 4, height = 0.12) => { bodyGroup.position.y = Math.abs(Math.sin(t * speed + rig.phase)) * height; }
       };
       animatedCharacters.push(rig);
       scene.add(root);
@@ -253,23 +212,9 @@
   };
   window.Studio = Studio;
 
-  function buildDefaultStudioShowcase() {
-    const floor = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.25, 64), Studio.paint(0x1e2536, "metal"));
-    floor.position.y = -0.15;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const hero = Studio.character({ color: 0xf59e0b, name: sceneData.title.slice(0, 14) || "KINETRA 3D" });
-    window.animateScene = function (t, p) {
-      hero.bounce(t, 3.2, 0.1);
-      hero.root.rotation.y = Math.sin(t * 1.1) * 0.45;
-      const angle = p * Math.PI * 1.2 - 0.6;
-      camera.position.set(Math.sin(angle) * 4.8, 1.8, Math.cos(angle) * 4.8);
-      camera.lookAt(0, 0.6, 0);
-    };
-  }
-
-  // 5. Studio Voice Engine + Real-Time Lip-Sync
+  // ============================================================================
+  // 5. MASTER VOICE & LIP-SYNC ENGINE
+  // ============================================================================
   let voiceAnalyser = null;
   let voiceTimeData = null;
 
@@ -281,264 +226,169 @@
       const v = (voiceTimeData[i] - 128) / 128;
       sum += v * v;
     }
-    return Math.min(1, Math.sqrt(sum / voiceTimeData.length) * 6.5);
+    return Math.min(1, Math.sqrt(sum / voiceTimeData.length) * 8.5); // Boosted RMS sensitivity for lip-sync
   }
 
-  function createStudioVoiceBus(ctx, dest) {
-    const warmthEQ = ctx.createBiquadFilter();
-    warmthEQ.type = "lowshelf";
-    warmthEQ.frequency.value = 165;
-    warmthEQ.gain.value = 5.0;
+  function createPowerfulVoiceBus(ctx, dest) {
+    const subPunch = ctx.createBiquadFilter();
+    subPunch.type = "lowshelf";
+    subPunch.frequency.value = 155;
+    subPunch.gain.value = 7.5; 
 
-    const clarityEQ = ctx.createBiquadFilter();
-    clarityEQ.type = "peaking";
-    clarityEQ.frequency.value = 3100;
-    clarityEQ.gain.value = 3.5;
+    const presence = ctx.createBiquadFilter();
+    presence.type = "peaking";
+    presence.frequency.value = 2900;
+    presence.Q.value = 1.0;
+    presence.gain.value = 5.0; 
 
     const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -20;
-    compressor.ratio.value = 3.5;
+    compressor.threshold.value = -24;
+    compressor.ratio.value = 5.0;
 
     voiceAnalyser = ctx.createAnalyser();
     voiceAnalyser.fftSize = 256;
     voiceTimeData = new Uint8Array(voiceAnalyser.frequencyBinCount);
 
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = 1.3;
+    const boostGain = ctx.createGain();
+    boostGain.gain.value = 2.5; 
 
-    warmthEQ.connect(clarityEQ);
-    clarityEQ.connect(compressor);
+    subPunch.connect(presence);
+    presence.connect(compressor);
     compressor.connect(voiceAnalyser);
-    voiceAnalyser.connect(masterGain);
-    masterGain.connect(dest);
-    try { masterGain.connect(ctx.destination); } catch (e) {}
-    return warmthEQ;
+    voiceAnalyser.connect(boostGain);
+    boostGain.connect(dest);
+    try { boostGain.connect(ctx.destination); } catch(e){}
+    return subPunch;
   }
 
-  function parseEmotionalBeats(text) {
-    const clean = text.replace(/\[.*?\]/g, " ").replace(/\s+/g, " ").trim();
-    if (!clean) return [];
-    const sentences = clean.match(/[^।!?…]+(?:[।!?…]+|$)/g) || [clean];
-    return sentences.map((s) => {
-      const trimmed = s.trim();
-      let rate = 1.0, detune = 0, pauseAfter = 0.32;
-      if (trimmed.endsWith("?")) { rate = 1.03; detune = 35; pauseAfter = 0.4; }
-      else if (trimmed.endsWith("!")) { rate = 1.05; detune = 20; pauseAfter = 0.36; }
-      else if (trimmed.includes("...") || trimmed.endsWith("…")) { rate = 0.93; detune = -30; pauseAfter = 0.45; }
-      return { text: trimmed, rate, detune, pauseAfter };
-    }).filter((b) => b.text.length > 0).slice(0, 8);
-  }
-
-  async function fetchNeuralVoice(ctx, text) {
+  async function fetchEmotionalNeuralVoice(ctx, text) {
     const isHindi = /[\u0900-\u097F]/.test(text);
-    const voice = isHindi ? "Aditi" : "Matthew";
     const endpoints = [
-      `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(text)}`,
-      `https://text.pollinations.ai/${encodeURIComponent("Read aloud naturally in " + (isHindi ? "Hindi" : "English") + ": " + text)}?model=openai-audio&voice=onyx`
+      `https://text.pollinations.ai/${encodeURIComponent("Speak with strong, dramatic emotion and energy in " + (isHindi ? "Hindi" : "English") + ": " + text)}?model=openai-audio&voice=onyx`,
+      `https://api.streamelements.com/kappa/v2/speech?voice=${isHindi ? "Aditi" : "Matthew"}&text=${encodeURIComponent(text)}`
     ];
     for (const url of endpoints) {
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 3200);
+        const tid = setTimeout(() => ctrl.abort(), 4000);
         const res = await fetch(url, { signal: ctrl.signal });
         clearTimeout(tid);
-        if (!res.ok) continue;
-        const arr = await res.arrayBuffer();
-        if (arr.byteLength < 500) continue;
-        return await ctx.decodeAudioData(arr);
+        if (res.ok) {
+          const arr = await res.arrayBuffer();
+          if (arr.byteLength > 600) return await ctx.decodeAudioData(arr);
+        }
       } catch (e) {}
     }
     return null;
   }
 
-  // 6. Master Execution & Android-Safe Video Recorder
-  async function startStudioEngine() {
-    if (uiStatus) uiStatus.textContent = "Building 3D Scene...";
-
+  // ============================================================================
+  // 6. RENDER LOOP & SAFE RECORDER
+  // ============================================================================
+  async function startEngine() {
     if (sceneData.code && sceneData.code.trim().length > 20) {
       try {
-        const safeCode = sanitizeAICode(sceneData.code);
-        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", safeCode);
+        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", sanitizeAICode(sceneData.code));
         runSceneBuilder(scene, camera, renderer, THREE, Studio);
       } catch (err) {
-        console.error("Custom scene script error:", err);
+        console.error("AI Scene Error:", err);
       }
     }
-
-    // If AI scene produced 0 visible meshes, automatically render the 3D showcase
-    if (countSceneMeshes() === 0) {
-      buildDefaultStudioShowcase();
+    const meshCount = calibrateSceneAndCamera(typeof window.animateScene === "function");
+    if (meshCount === 0) {
+      const hero = Studio.character({ color: 0xf59e0b, name: sceneData.title || "KINETRA" });
+      window.animateScene = (t, p) => { hero.bounce(t); camera.position.x = Math.sin(t) * 4; camera.lookAt(0,1,0); };
     }
 
-    enforceVisualContrast();
-    renderer.render(scene, camera);
-
-    if (uiStatus) uiStatus.textContent = "Rendering 3D Video & Studio Voice...";
-
-    let audioCtx = null;
-    let audioDest = null;
-    let osc1 = null;
-    let osc2 = null;
-    let audioActive = false;
-
+    let audioCtx = null, audioDest = null, osc1 = null, audioActive = false;
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioCtx();
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
-        const unlock = () => { if (audioCtx) audioCtx.resume().catch(() => {}); };
-        document.addEventListener("touchstart", unlock, { once: true });
-        document.addEventListener("click", unlock, { once: true });
-      }
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const unlockAudio = () => { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(()=>{}); };
+      unlockAudio();
+      document.addEventListener("touchstart", unlockAudio, { passive: true });
+      document.addEventListener("click", unlockAudio, { passive: true });
+
       audioDest = audioCtx.createMediaStreamDestination();
+      
+      const padF = audioCtx.createBiquadFilter(); padF.type="lowpass"; padF.frequency.value = 180;
+      const padG = audioCtx.createGain(); padG.gain.value = 0.012;
+      padF.connect(padG); padG.connect(audioDest);
+      osc1 = audioCtx.createOscillator(); osc1.frequency.value = 98;
+      osc1.connect(padF); osc1.start();
 
-      const padFilter = audioCtx.createBiquadFilter();
-      padFilter.type = "lowpass";
-      padFilter.frequency.value = 260;
-      const padGain = audioCtx.createGain();
-      padGain.gain.value = 0.015;
-      padFilter.connect(padGain);
-      padGain.connect(audioDest);
-
-      osc1 = audioCtx.createOscillator();
-      osc1.type = "triangle";
-      osc1.frequency.value = 130.81;
-      osc2 = audioCtx.createOscillator();
-      osc2.type = "sine";
-      osc2.frequency.value = 196.00;
-      osc1.connect(padFilter);
-      osc2.connect(padFilter);
-      osc1.start();
-      osc2.start();
-
-      const beats = parseEmotionalBeats(sceneData.narration || "");
-      if (beats.length > 0) {
-        const voiceBus = createStudioVoiceBus(audioCtx, audioDest);
-        const clips = await Promise.all(beats.map((b) => fetchNeuralVoice(audioCtx, b.text)));
-        let cursor = audioCtx.currentTime + 0.15;
-        clips.forEach((clip, i) => {
-          if (!clip) return;
-          const beat = beats[i];
-          const src = audioCtx.createBufferSource();
-          src.buffer = clip;
-          src.playbackRate.value = beat.rate;
-          if (src.detune) src.detune.value = beat.detune;
-          src.connect(voiceBus);
-          src.start(cursor);
-          cursor += (clip.duration / beat.rate) + beat.pauseAfter;
-        });
+      const text = sceneData.narration.replace(/\[.*?\]/g, " ").trim();
+      if (text) {
+        const voiceBus = createPowerfulVoiceBus(audioCtx, audioDest);
+        const clip = await fetchEmotionalNeuralVoice(audioCtx, text);
+        if (clip) {
+          const scheduleClip = () => {
+            const src = audioCtx.createBufferSource();
+            src.buffer = clip;
+            src.connect(voiceBus);
+            src.start(audioCtx.currentTime + 0.1);
+          };
+          if (audioCtx.state === "running") scheduleClip();
+          else document.addEventListener("touchstart", () => audioCtx.resume().then(scheduleClip), { once: true });
+        }
       }
-
       audioActive = (audioCtx.state === "running");
-    } catch (audioErr) {}
+    } catch(e){}
 
     const DURATION = 15000;
     const canvas = renderer.domElement;
-    const videoStream = canvas.captureStream(30);
-    const tracks = [...videoStream.getVideoTracks()];
-    // Only mix audio track if AudioContext is actively running (prevents 0-byte stall on Android WebView)
-    if (audioActive && audioDest && audioDest.stream) {
-      tracks.push(...audioDest.stream.getAudioTracks());
-    }
-    const fullStream = new MediaStream(tracks);
-
+    const tracks = [...canvas.captureStream(30).getVideoTracks()];
+    if (audioActive && audioDest) tracks.push(...audioDest.stream.getAudioTracks());
+    
     let recorder = null;
     const chunks = [];
-    const candidateMimes = [
-      "video/webm;codecs=vp8,opus",
-      "video/webm;codecs=vp8",
-      "video/webm",
-      "video/mp4"
-    ];
-    const chosenMime = candidateMimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
-
     try {
-      recorder = chosenMime
-        ? new MediaRecorder(fullStream, { mimeType: chosenMime, videoBitsPerSecond: 4000000 })
-        : new MediaRecorder(fullStream);
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-
+      const mime = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp8", "video/mp4", "video/webm"].find(m => MediaRecorder.isTypeSupported(m)) || "";
+      recorder = mime ? new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 4500000 }) : new MediaRecorder(new MediaStream(tracks));
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = () => {
-        try { if (osc1) osc1.stop(); if (osc2) osc2.stop(); } catch (e) {}
-        const blobType = chosenMime.includes("mp4") ? "video/mp4" : "video/webm";
-        const blob = new Blob(chunks, { type: blobType });
-        const videoUrl = URL.createObjectURL(blob);
-
+        try { if(osc1) osc1.stop(); } catch(e){}
+        const blob = new Blob(chunks, { type: mime.includes("mp4") ? "video/mp4" : "video/webm" });
+        if (blob.size > 1000) {
+          const url = URL.createObjectURL(blob);
+          const btn = document.getElementById("uiDownloadBtn");
+          if (btn) { btn.href = url; btn.download = "kinetra3d_video." + (mime.includes("mp4") ? "mp4" : "webm"); btn.classList.remove("locked"); }
+          const p = document.getElementById("finalPlayer");
+          if (p) { p.src = url; p.style.display = "block"; canvas.style.display = "none"; p.play().catch(()=>{}); }
+        }
         const hud = document.getElementById("renderHud");
         if (hud) hud.style.display = "none";
-
-        if (uiBadge) {
-          uiBadge.textContent = "READY";
-          uiBadge.classList.add("ready");
-        }
-
-        if (uiDownloadBtn && blob.size > 0) {
-          uiDownloadBtn.href = videoUrl;
-          const ext = blobType === "video/mp4" ? ".mp4" : ".webm";
-          uiDownloadBtn.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ext;
-          uiDownloadBtn.textContent = "Download Video";
-          uiDownloadBtn.classList.remove("locked");
-        }
-
-        const player = document.getElementById("finalPlayer");
-        if (player && blob.size > 2000) {
-          player.onerror = () => {
-            player.style.display = "none";
-            canvas.style.display = "block";
-          };
-          player.onloadeddata = () => {
-            canvas.style.display = "none";
-            player.style.display = "block";
-            player.play().catch(() => {});
-          };
-          player.src = videoUrl;
-        }
+        const badge = document.getElementById("uiBadge");
+        if (badge) { badge.textContent = "READY"; badge.classList.add("ready"); }
       };
+      recorder.start(250); // Important for Android WebView
+    } catch(e){}
 
-      recorder.start(250);
-    } catch (recErr) {
-      console.error("MediaRecorder error:", recErr);
-    }
-
-    const startTime = performance.now();
-    let recordingStopped = false;
-
+    const startT = performance.now();
+    let stopped = false;
     function renderLoop(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(1, elapsed / DURATION);
-      const t = elapsed / 1000;
+      const el = now - startT;
+      const p = Math.min(1, el / DURATION);
+      const t = el / 1000;
 
-      const voiceEnergy = getLiveVoiceEnergy();
-      const blink = Math.sin(t * 1.9) > 0.985 ? 0.12 : 1.0;
-
-      animatedCharacters.forEach((rig) => {
-        rig.leftEye.scale.y = blink;
-        rig.rightEye.scale.y = blink;
-        if (rig.speaking) rig.mouthPivot.scale.y = 0.6 + voiceEnergy * 3.2;
+      const vE = getLiveVoiceEnergy();
+      const blink = Math.sin(t * 1.9) > 0.98 ? 0.1 : 1.0;
+      animatedCharacters.forEach((r) => {
+        r.leftEye.scale.y = blink; r.rightEye.scale.y = blink;
+        if (r.speaking) r.mouthPivot.scale.y = 0.5 + vE;
       });
 
-      if (typeof window.animateScene === "function") {
-        try { window.animateScene(t, progress); } catch (e) {}
-      }
-
+      if (typeof window.animateScene === "function") { try { window.animateScene(t, p); } catch(e){} }
       renderer.render(scene, camera);
 
-      if (uiProgress) uiProgress.style.width = Math.floor(progress * 100) + "%";
-      if (uiTimer) uiTimer.textContent = Math.max(0, Math.ceil((DURATION - elapsed) / 1000)) + "s";
+      const prog = document.getElementById("uiProgress"), tim = document.getElementById("uiTimer");
+      if (prog) prog.style.width = Math.floor(p * 100) + "%";
+      if (tim) tim.textContent = Math.max(0, Math.ceil((DURATION - el)/1000)) + "s";
 
-      if (progress >= 1 && !recordingStopped) {
-        recordingStopped = true;
-        if (recorder && recorder.state !== "inactive") recorder.stop();
-      }
-
+      if (p >= 1 && !stopped) { stopped = true; if (recorder && recorder.state !== "inactive") recorder.stop(); }
       requestAnimationFrame(renderLoop);
     }
-
     requestAnimationFrame(renderLoop);
   }
 
-  startStudioEngine();
+  startEngine();
 })();
