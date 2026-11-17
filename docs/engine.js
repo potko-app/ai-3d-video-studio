@@ -63,7 +63,7 @@
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.05;
   renderer.outputEncoding = THREE.sRGBEncoding;
   previewContainer.insertBefore(renderer.domElement, previewContainer.firstChild);
 
@@ -82,28 +82,40 @@
   scene.background = new THREE.Color(theme.bg);
 
   const studioRig = new THREE.Group();
-  const hemiLight = new THREE.HemisphereLight(0xffffff, theme.ground, 0.75);
-  const keyLight = new THREE.DirectionalLight(theme.key, 1.3);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, theme.ground, 0.85);
+  const keyLight = new THREE.DirectionalLight(theme.key, 1.4);
   keyLight.position.set(6, 12, 8);
   keyLight.castShadow = true;
-  const rimLight = new THREE.PointLight(theme.rim, 1.6, 28, 2);
+  const rimLight = new THREE.PointLight(theme.rim, 1.8, 28, 2);
   rimLight.position.set(-5, 4.5, -4);
   studioRig.add(hemiLight, keyLight, rimLight);
   scene.add(studioRig);
 
+  // Sanitize AI Code so it cannot shadow our active scene/camera/renderer
+  function sanitizeAICode(rawCode) {
+    return rawCode
+      .replace(/(?:const|let|var)\s+scene\s*=\s*new\s+THREE\.Scene\s*\([^)]*\)\s*;?/g, "// bound to studio scene")
+      .replace(/(?:const|let|var)\s+camera\s*=\s*new\s+THREE\.PerspectiveCamera\s*\([^)]*\)\s*;?/g, "// bound to studio camera")
+      .replace(/(?:const|let|var)\s+renderer\s*=\s*new\s+THREE\.WebGLRenderer\s*\([^)]*\)\s*;?/g, "// bound to studio renderer")
+      .replace(/document\.body\.appendChild\s*\(\s*renderer\.domElement\s*\)\s*;?/g, "")
+      .replace(/renderer\.setSize\s*\([^)]*\)\s*;?/g, "");
+  }
+
+  function countSceneMeshes() {
+    let count = 0;
+    scene.traverse((obj) => { if (obj.isMesh) count++; });
+    return count;
+  }
+
   // Contrast & Anti-Whiteout Protection Pass
   function enforceVisualContrast() {
-    // 1. Prevent blinding white sky/background from washing out characters
     if (scene.background && scene.background.isColor) {
       const bgLum = 0.2126 * scene.background.r + 0.7152 * scene.background.g + 0.0722 * scene.background.b;
-      if (bgLum > 0.45) {
-        scene.background.setHex(theme.bg);
-      }
+      if (bgLum > 0.45) scene.background.setHex(theme.bg);
     } else {
       scene.background = new THREE.Color(theme.bg);
     }
 
-    // 2. Clamp over-bright lights & convert unlit white MeshBasicMaterials to shaded PBR
     let customLights = 0;
     scene.traverse((node) => {
       if (node.isLight && node.parent !== studioRig) {
@@ -117,7 +129,6 @@
             const lum = 0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b;
             if (lum > 0.82) m.color.multiplyScalar(0.82 / lum);
           }
-          // Convert unlit MeshBasicMaterial (without texture) into shaded StandardMaterial so shapes have 3D depth
           if (m.isMeshBasicMaterial && !m.map) {
             const shaded = new THREE.MeshStandardMaterial({
               color: m.color || 0xcccccc,
@@ -134,8 +145,8 @@
     });
 
     if (customLights > 0) {
-      keyLight.intensity = 0.65;
-      hemiLight.intensity = 0.35;
+      keyLight.intensity = 0.7;
+      hemiLight.intensity = 0.4;
     }
   }
 
@@ -343,19 +354,19 @@
   // 6. Master Execution & Android-Safe Video Recorder
   async function startStudioEngine() {
     if (uiStatus) uiStatus.textContent = "Building 3D Scene...";
-    let customBuilt = false;
 
     if (sceneData.code && sceneData.code.trim().length > 20) {
       try {
-        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", sceneData.code);
+        const safeCode = sanitizeAICode(sceneData.code);
+        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", safeCode);
         runSceneBuilder(scene, camera, renderer, THREE, Studio);
-        customBuilt = true;
       } catch (err) {
         console.error("Custom scene script error:", err);
       }
     }
 
-    if (!customBuilt) {
+    // If AI scene produced 0 visible meshes, automatically render the 3D showcase
+    if (countSceneMeshes() === 0) {
       buildDefaultStudioShowcase();
     }
 
@@ -368,6 +379,7 @@
     let audioDest = null;
     let osc1 = null;
     let osc2 = null;
+    let audioActive = false;
 
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -416,13 +428,18 @@
           cursor += (clip.duration / beat.rate) + beat.pauseAfter;
         });
       }
+
+      audioActive = (audioCtx.state === "running");
     } catch (audioErr) {}
 
     const DURATION = 15000;
     const canvas = renderer.domElement;
     const videoStream = canvas.captureStream(30);
     const tracks = [...videoStream.getVideoTracks()];
-    if (audioDest && audioDest.stream) tracks.push(...audioDest.stream.getAudioTracks());
+    // Only mix audio track if AudioContext is actively running (prevents 0-byte stall on Android WebView)
+    if (audioActive && audioDest && audioDest.stream) {
+      tracks.push(...audioDest.stream.getAudioTracks());
+    }
     const fullStream = new MediaStream(tracks);
 
     let recorder = null;
@@ -458,7 +475,7 @@
           uiBadge.classList.add("ready");
         }
 
-        if (uiDownloadBtn && blob.size > 2000) {
+        if (uiDownloadBtn && blob.size > 0) {
           uiDownloadBtn.href = videoUrl;
           const ext = blobType === "video/mp4" ? ".mp4" : ".webm";
           uiDownloadBtn.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ext;
@@ -466,7 +483,6 @@
           uiDownloadBtn.classList.remove("locked");
         }
 
-        // Only swap canvas to <video> if blob is valid and playable; otherwise keep live 3D looping!
         const player = document.getElementById("finalPlayer");
         if (player && blob.size > 2000) {
           player.onerror = () => {
@@ -482,7 +498,6 @@
         }
       };
 
-      // Pass 250ms timeslice so Android WebView flushes valid video keyframes reliably
       recorder.start(250);
     } catch (recErr) {
       console.error("MediaRecorder error:", recErr);
@@ -519,7 +534,6 @@
         if (recorder && recorder.state !== "inactive") recorder.stop();
       }
 
-      // Keep rendering smoothly so live preview never freezes or goes blank
       requestAnimationFrame(renderLoop);
     }
 
