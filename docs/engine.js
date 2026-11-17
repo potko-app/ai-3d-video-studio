@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  // ============================================================================
-  // 1. PAYLOAD DECODER (UTF-8 & URL-Safe Base64)
-  // ============================================================================
+  // 1. Safe UTF-8 & URL-Safe Base64 Payload Decoder
   function decodePayload(raw) {
     let clean = raw.trim();
     try { clean = decodeURIComponent(clean); } catch (e) {}
@@ -44,37 +42,28 @@
 
   if (uiTitle) uiTitle.textContent = sceneData.title || "Kinetra3D Studio";
 
-  // ============================================================================
-  // 2. MATHEMATICAL EASING & KINEMATIC INTERPOLATION LOGIC (Cycles-Inspired)
-  // ============================================================================
+  // 2. Mathematical Keyframe & Easing Engine
   const MathLogic = {
     clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
     lerp: (a, b, t) => a + (b - a) * t,
-    smoothstep: (edge0, edge1, x) => {
-      const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    smoothstep: (e0, e1, x) => {
+      const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
       return t * t * (3 - 2 * t);
     },
     easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
-    elasticOut: (t) => {
-      if (t === 0 || t === 1) return t;
-      return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
-    },
     beat: (t, start, end) => MathLogic.smoothstep(start, end, t)
   };
 
-  // ============================================================================
-  // 3. WEBGL RENDERER & PHOTOMETRIC COLOR MANAGEMENT LOGIC
-  // ============================================================================
+  // 3. Cinema WebGL Renderer
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
-    preserveDrawingBuffer: true,
-    powerPreference: "high-performance"
+    preserveDrawingBuffer: true
   });
   renderer.setSize(1280, 720);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
   previewContainer.insertBefore(renderer.domElement, previewContainer.firstChild);
 
@@ -83,133 +72,109 @@
   camera.position.set(0, 2.2, 6.5);
 
   const ATMOSPHERES = {
-    cyber_neon:     { bg: 0x070b18, key: 0x60a5fa, rim: 0xf43f5e, ground: 0x0f172a },
-    magical_forest: { bg: 0x071a12, key: 0x34d399, rim: 0xfbbf24, ground: 0x064e3b },
-    sunset_golden:  { bg: 0x230f07, key: 0xfbbf24, rim: 0xf97316, ground: 0x451a03 },
-    space_cosmos:   { bg: 0x04040d, key: 0xa78bfa, rim: 0x38bdf8, ground: 0x090d16 },
-    studio_clean:   { bg: 0x161923, key: 0xfff8eb, rim: 0x818cf8, ground: 0x1e2230 }
+    cyber_neon:     { bg: 0x090d1c, key: 0x60a5fa, rim: 0xf43f5e, ground: 0x1e293b },
+    magical_forest: { bg: 0x0a1f16, key: 0x34d399, rim: 0xfbbf24, ground: 0x064e3b },
+    sunset_golden:  { bg: 0x261209, key: 0xfbbf24, rim: 0xf97316, ground: 0x451a03 },
+    space_cosmos:   { bg: 0x070714, key: 0xa78bfa, rim: 0x38bdf8, ground: 0x0f172a },
+    studio_clean:   { bg: 0x161b28, key: 0xfff8eb, rim: 0x818cf8, ground: 0x1e2536 }
   };
   const theme = ATMOSPHERES[sceneData.atmosphere] || ATMOSPHERES.studio_clean;
   scene.background = new THREE.Color(theme.bg);
 
-  // Base Studio Light Rig (Kept separate so AI lights can blend or replace cleanly)
   const studioRig = new THREE.Group();
-  studioRig.name = "StudioBaseRig";
   const hemiLight = new THREE.HemisphereLight(0xffffff, theme.ground, 0.75);
-  const keyLight = new THREE.DirectionalLight(theme.key, 1.35);
+  const keyLight = new THREE.DirectionalLight(theme.key, 1.3);
   keyLight.position.set(6, 12, 8);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1024, 1024);
-  keyLight.shadow.bias = -0.0005;
-  const rimLight = new THREE.PointLight(theme.rim, 1.8, 28, 2);
+  const rimLight = new THREE.PointLight(theme.rim, 1.6, 28, 2);
   rimLight.position.set(-5, 4.5, -4);
   studioRig.add(hemiLight, keyLight, rimLight);
   scene.add(studioRig);
 
-  // Photometric Energy Conservation & Color Calibration Pass
-  // Prevents whiteout by conserving PBR albedo reflectance and balancing total scene lux
-  function calibratePhotometricScene() {
-    let customDirectionalEnergy = 0;
-    let customAmbientEnergy = 0;
+  // Contrast & Anti-Whiteout Protection Pass
+  function enforceVisualContrast() {
+    // 1. Prevent blinding white sky/background from washing out characters
+    if (scene.background && scene.background.isColor) {
+      const bgLum = 0.2126 * scene.background.r + 0.7152 * scene.background.g + 0.0722 * scene.background.b;
+      if (bgLum > 0.45) {
+        scene.background.setHex(theme.bg);
+      }
+    } else {
+      scene.background = new THREE.Color(theme.bg);
+    }
 
+    // 2. Clamp over-bright lights & convert unlit white MeshBasicMaterials to shaded PBR
+    let customLights = 0;
     scene.traverse((node) => {
       if (node.isLight && node.parent !== studioRig) {
-        if (node.isDirectionalLight) customDirectionalEnergy += node.intensity;
-        if (node.isAmbientLight || node.isHemisphereLight) customAmbientEnergy += node.intensity;
+        customLights++;
+        if (node.intensity > 1.4) node.intensity = 1.25;
       }
-
-      // Enforce Blender Principled BSDF Albedo Energy Conservation (Max reflectance <= 0.85)
       if (node.isMesh && node.material) {
         const mats = Array.isArray(node.material) ? node.material : [node.material];
-        mats.forEach((m) => {
+        mats.forEach((m, idx) => {
           if (m.color) {
             const lum = 0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b;
-            if (lum > 0.85) m.color.multiplyScalar(0.85 / lum);
+            if (lum > 0.82) m.color.multiplyScalar(0.82 / lum);
           }
-          if (m.emissive && m.emissiveIntensity > 1.2) {
-            m.emissiveIntensity = 1.2;
-          }
-          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-            if (m.roughness === undefined) m.roughness = 0.45;
+          // Convert unlit MeshBasicMaterial (without texture) into shaded StandardMaterial so shapes have 3D depth
+          if (m.isMeshBasicMaterial && !m.map) {
+            const shaded = new THREE.MeshStandardMaterial({
+              color: m.color || 0xcccccc,
+              roughness: 0.45,
+              metalness: 0.1,
+              transparent: m.transparent,
+              opacity: m.opacity
+            });
+            if (Array.isArray(node.material)) node.material[idx] = shaded;
+            else node.material = shaded;
           }
         });
       }
     });
 
-    // If AI added its own lighting, proportionally scale down base rig instead of blinding the scene
-    if (customDirectionalEnergy > 0 || customAmbientEnergy > 0) {
-      const totalDir = customDirectionalEnergy + keyLight.intensity;
-      if (totalDir > 2.2) {
-        const scale = 2.0 / totalDir;
-        keyLight.intensity *= scale;
-        hemiLight.intensity *= 0.45;
-      }
-      if (customAmbientEnergy > 1.0) {
-        hemiLight.intensity = 0.15;
-      }
+    if (customLights > 0) {
+      keyLight.intensity = 0.65;
+      hemiLight.intensity = 0.35;
     }
   }
 
-  // ============================================================================
-  // 4. BLENDER-STYLE PROCEDURAL BUILDER, TEXTURE & CHARACTER RIGGING ENGINE
-  // ============================================================================
+  // 4. Built-in Blender-Style Artist Toolkit (Studio.*)
   const animatedCharacters = [];
-  const secondaryAnimators = [];
-
   const Studio = {
     Math: MathLogic,
-
-    // Procedural PBR Material Generator (Matte, Glossy, Metal, Glass, Neon)
     paint(colorHex, finish = "standard") {
       const c = new THREE.Color(colorHex);
-      switch (finish) {
-        case "glossy":
-          return new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1 });
-        case "metal":
-          return new THREE.MeshStandardMaterial({ color: c, roughness: 0.22, metalness: 0.88 });
-        case "matte":
-          return new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.02 });
-        case "glass":
-          return new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.55 });
-        case "neon":
-          return new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.3 });
-        default:
-          return new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.12 });
-      }
+      if (finish === "glossy") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1 });
+      if (finish === "metal") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.22, metalness: 0.88 });
+      if (finish === "matte") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.02 });
+      if (finish === "neon") return new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.85, roughness: 0.3 });
+      return new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.12 });
     },
-
-    // Procedural Canvas Texture (Chalkboard, Wood, Label/Name Tag on any object)
     createTextTexture(text, opts = {}) {
       const canvas = document.createElement("canvas");
       canvas.width = opts.width || 512;
       canvas.height = opts.height || 256;
       const ctx = canvas.getContext("2d");
-
       ctx.fillStyle = opts.bg || "#1e293b";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
       if (opts.border) {
         ctx.strokeStyle = opts.border;
         ctx.lineWidth = 10;
         ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
       }
-
       ctx.fillStyle = opts.color || "#ffffff";
       ctx.font = `bold ${opts.fontSize || 48}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
       const lines = String(text).split("\n");
-      const lineHeight = (opts.fontSize || 48) * 1.25;
-      const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
-      lines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, startY + i * lineHeight));
-
+      const lh = (opts.fontSize || 48) * 1.25;
+      const startY = canvas.height / 2 - ((lines.length - 1) * lh) / 2;
+      lines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, startY + i * lh));
       const tex = new THREE.CanvasTexture(canvas);
       tex.encoding = THREE.sRGBEncoding;
       return tex;
     },
-
-    // Attach Custom Name/Label Plate to any 3D Character or Object
     label(targetMesh, text, opts = {}) {
       const tex = Studio.createTextTexture(text, opts);
       const plane = new THREE.Mesh(
@@ -220,8 +185,6 @@
       targetMesh.add(plane);
       return plane;
     },
-
-    // Blender Lathe Modifier (Creates smooth revolved 3D shapes: cups, vases, domes, pawns)
     lathe(profilePoints, segments = 48, material = null) {
       const pts = profilePoints.map(([x, y]) => new THREE.Vector2(x, y));
       const geo = new THREE.LatheGeometry(pts, segments);
@@ -231,118 +194,61 @@
       mesh.receiveShadow = true;
       return mesh;
     },
-
-    // Kinematic Character Rig Builder (Body + Expressive Eyes + Audio-Synced Mouth + Name Tag)
     character(opts = {}) {
       const root = new THREE.Group();
       const bodyGroup = new THREE.Group();
       root.add(bodyGroup);
-
-      const color = opts.color || 0x3b82f6;
-      const mat = Studio.paint(color, opts.finish || "glossy");
-
-      let bodyMesh;
-      if (opts.shape === "cup") {
-        bodyMesh = Studio.lathe([[0, 0], [0.42, 0], [0.55, 0.95], [0.48, 0.95], [0.36, 0.12], [0, 0.12]], 48, mat);
-        const handle = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.055, 16, 32, Math.PI), mat);
-        handle.position.set(0.48, 0.5, 0);
-        handle.rotation.z = -Math.PI / 2;
-        bodyGroup.add(handle);
-      } else if (opts.shape === "biscuit" || opts.shape === "disc") {
-        bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.22, 36), mat);
-        bodyMesh.rotation.x = Math.PI / 2;
-        bodyMesh.position.y = 0.55;
-      } else {
-        bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.52, 32, 32), mat);
-        bodyMesh.scale.set(1, opts.tall ? 1.35 : 1.05, 0.92);
-        bodyMesh.position.y = 0.55;
-      }
+      const mat = Studio.paint(opts.color || 0x3b82f6, opts.finish || "glossy");
+      const bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.52, 32, 32), mat);
+      bodyMesh.scale.set(1, opts.tall ? 1.35 : 1.05, 0.92);
+      bodyMesh.position.y = 0.55;
       bodyMesh.castShadow = true;
-      bodyMesh.receiveShadow = true;
       bodyGroup.add(bodyMesh);
 
-      // Expressive Eyes + Pupils + Brows
-      const faceZ = opts.shape === "disc" ? 0.13 : 0.46;
-      const eyeY = 0.65;
-      const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const eyeWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const pupilMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
-
-      const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), eyeWhiteMat);
-      leftEye.position.set(-0.18, eyeY, faceZ);
+      const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), eyeWhite);
+      leftEye.position.set(-0.18, 0.65, 0.46);
       const rightEye = leftEye.clone();
       rightEye.position.x = 0.18;
-
-      const leftPupil = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), pupilMat);
-      leftPupil.position.set(0, 0, 0.08);
-      leftEye.add(leftPupil);
-
-      const rightPupil = leftPupil.clone();
-      rightEye.add(rightPupil);
-
+      const lp = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), pupilMat);
+      lp.position.z = 0.08;
+      leftEye.add(lp);
+      rightEye.add(lp.clone());
       bodyGroup.add(leftEye, rightEye);
 
-      // Audio-Driven Lip-Sync Mouth Rig
       const mouthPivot = new THREE.Group();
-      mouthPivot.position.set(0, 0.42, faceZ + 0.03);
-      const mouthMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 0.06, 0.05),
-        new THREE.MeshBasicMaterial({ color: 0x1e1b4b })
-      );
-      mouthPivot.add(mouthMesh);
+      mouthPivot.position.set(0, 0.42, 0.49);
+      mouthPivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.05), new THREE.MeshBasicMaterial({ color: 0x1e1b4b })));
       bodyGroup.add(mouthPivot);
 
-      // Optional Custom Name Printed on Character
       if (opts.name) {
-        Studio.label(bodyGroup, opts.name, {
-          w: 0.75, h: 0.26, y: 0.2, z: faceZ + 0.04,
-          bg: "rgba(0,0,0,0.65)", color: "#ffffff", fontSize: 44
-        });
+        Studio.label(bodyGroup, opts.name, { w: 0.75, h: 0.26, y: 0.2, z: 0.5, bg: "rgba(0,0,0,0.7)", color: "#ffffff", fontSize: 44 });
       }
 
       const rig = {
-        root,
-        bodyGroup,
-        leftEye,
-        rightEye,
-        mouthPivot,
+        root, bodyGroup, leftEye, rightEye, mouthPivot,
         speaking: opts.speaking !== false,
         phase: Math.random() * Math.PI * 2,
         bounce(t, speed = 4, height = 0.12) {
           const s = Math.abs(Math.sin(t * speed + rig.phase));
           bodyGroup.position.y = s * height;
-          bodyGroup.scale.set(1 + (1 - s) * 0.06, 1 - (1 - s) * 0.06, 1 + (1 - s) * 0.06);
         }
       };
-
       animatedCharacters.push(rig);
       scene.add(root);
       return rig;
     }
   };
-
-  // Expose Studio globally so AI code can use Studio.* directly
   window.Studio = Studio;
 
-  // ============================================================================
-  // 5. FALLBACK STUDIO STAGE (Only if AI sends no custom 3D code)
-  // ============================================================================
   function buildDefaultStudioShowcase() {
-    const floor = new THREE.Mesh(
-      new THREE.CylinderGeometry(4.2, 4.5, 0.25, 64),
-      Studio.paint(0x1e2230, "metal")
-    );
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.25, 64), Studio.paint(0x1e2536, "metal"));
     floor.position.y = -0.15;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const hero = Studio.character({
-      shape: "cup",
-      color: 0xf59e0b,
-      finish: "glossy",
-      name: sceneData.title.slice(0, 14) || "KINETRA 3D"
-    });
-    hero.root.position.set(0, 0, 0);
-
+    const hero = Studio.character({ color: 0xf59e0b, name: sceneData.title.slice(0, 14) || "KINETRA 3D" });
     window.animateScene = function (t, p) {
       hero.bounce(t, 3.2, 0.1);
       hero.root.rotation.y = Math.sin(t * 1.1) * 0.45;
@@ -352,9 +258,7 @@
     };
   }
 
-  // ============================================================================
-  // 6. STUDIO VOICE ENGINE + REAL-TIME WAVEFORM LIP-SYNC ANALYSER
-  // ============================================================================
+  // 5. Studio Voice Engine + Real-Time Lip-Sync
   let voiceAnalyser = null;
   let voiceTimeData = null;
 
@@ -378,15 +282,11 @@
     const clarityEQ = ctx.createBiquadFilter();
     clarityEQ.type = "peaking";
     clarityEQ.frequency.value = 3100;
-    clarityEQ.Q.value = 1.1;
     clarityEQ.gain.value = 3.5;
 
     const compressor = ctx.createDynamicsCompressor();
     compressor.threshold.value = -20;
-    compressor.knee.value = 18;
     compressor.ratio.value = 3.5;
-    compressor.attack.value = 0.004;
-    compressor.release.value = 0.18;
 
     voiceAnalyser = ctx.createAnalyser();
     voiceAnalyser.fftSize = 256;
@@ -401,7 +301,6 @@
     voiceAnalyser.connect(masterGain);
     masterGain.connect(dest);
     try { masterGain.connect(ctx.destination); } catch (e) {}
-
     return warmthEQ;
   }
 
@@ -429,7 +328,7 @@
     for (const url of endpoints) {
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 3500);
+        const tid = setTimeout(() => ctrl.abort(), 3200);
         const res = await fetch(url, { signal: ctrl.signal });
         clearTimeout(tid);
         if (!res.ok) continue;
@@ -441,9 +340,7 @@
     return null;
   }
 
-  // ============================================================================
-  // 7. MASTER EXECUTION & RECORDING PIPELINE
-  // ============================================================================
+  // 6. Master Execution & Android-Safe Video Recorder
   async function startStudioEngine() {
     if (uiStatus) uiStatus.textContent = "Building 3D Scene...";
     let customBuilt = false;
@@ -462,8 +359,7 @@
       buildDefaultStudioShowcase();
     }
 
-    // Apply Photometric Color & Lighting Calibration after scene construction
-    calibratePhotometricScene();
+    enforceVisualContrast();
     renderer.render(scene, camera);
 
     if (uiStatus) uiStatus.textContent = "Rendering 3D Video & Studio Voice...";
@@ -484,7 +380,6 @@
       }
       audioDest = audioCtx.createMediaStreamDestination();
 
-      // Subtle Ambient Bed
       const padFilter = audioCtx.createBiquadFilter();
       padFilter.type = "lowpass";
       padFilter.frequency.value = 260;
@@ -504,7 +399,6 @@
       osc1.start();
       osc2.start();
 
-      // Parallel Neural Voice Loading & Scheduling
       const beats = parseEmotionalBeats(sceneData.narration || "");
       if (beats.length > 0) {
         const voiceBus = createStudioVoiceBus(audioCtx, audioDest);
@@ -522,9 +416,7 @@
           cursor += (clip.duration / beat.rate) + beat.pauseAfter;
         });
       }
-    } catch (audioErr) {
-      console.warn("Audio pipeline warning:", audioErr);
-    }
+    } catch (audioErr) {}
 
     const DURATION = 15000;
     const canvas = renderer.domElement;
@@ -535,67 +427,83 @@
 
     let recorder = null;
     const chunks = [];
+    const candidateMimes = [
+      "video/webm;codecs=vp8,opus",
+      "video/webm;codecs=vp8",
+      "video/webm",
+      "video/mp4"
+    ];
+    const chosenMime = candidateMimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+
     try {
-      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
-      recorder = mime
-        ? new MediaRecorder(fullStream, { mimeType: mime, videoBitsPerSecond: 5500000 })
+      recorder = chosenMime
+        ? new MediaRecorder(fullStream, { mimeType: chosenMime, videoBitsPerSecond: 4000000 })
         : new MediaRecorder(fullStream);
 
-      recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
       recorder.onstop = () => {
         try { if (osc1) osc1.stop(); if (osc2) osc2.stop(); } catch (e) {}
-        const blob = new Blob(chunks, { type: "video/webm" });
+        const blobType = chosenMime.includes("mp4") ? "video/mp4" : "video/webm";
+        const blob = new Blob(chunks, { type: blobType });
         const videoUrl = URL.createObjectURL(blob);
 
         const hud = document.getElementById("renderHud");
         if (hud) hud.style.display = "none";
-        canvas.style.display = "none";
-
-        const player = document.getElementById("finalPlayer");
-        if (player) {
-          player.src = videoUrl;
-          player.style.display = "block";
-          player.play().catch(() => {});
-        }
 
         if (uiBadge) {
           uiBadge.textContent = "READY";
           uiBadge.classList.add("ready");
         }
-        if (uiDownloadBtn) {
+
+        if (uiDownloadBtn && blob.size > 2000) {
           uiDownloadBtn.href = videoUrl;
-          uiDownloadBtn.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ".webm";
+          const ext = blobType === "video/mp4" ? ".mp4" : ".webm";
+          uiDownloadBtn.download = (sceneData.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "kinetra3d") + ext;
           uiDownloadBtn.textContent = "Download Video";
           uiDownloadBtn.classList.remove("locked");
         }
+
+        // Only swap canvas to <video> if blob is valid and playable; otherwise keep live 3D looping!
+        const player = document.getElementById("finalPlayer");
+        if (player && blob.size > 2000) {
+          player.onerror = () => {
+            player.style.display = "none";
+            canvas.style.display = "block";
+          };
+          player.onloadeddata = () => {
+            canvas.style.display = "none";
+            player.style.display = "block";
+            player.play().catch(() => {});
+          };
+          player.src = videoUrl;
+        }
       };
-      recorder.start();
+
+      // Pass 250ms timeslice so Android WebView flushes valid video keyframes reliably
+      recorder.start(250);
     } catch (recErr) {
       console.error("MediaRecorder error:", recErr);
     }
 
     const startTime = performance.now();
+    let recordingStopped = false;
 
     function renderLoop(now) {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / DURATION);
       const t = elapsed / 1000;
 
-      // Secondary Motion: Idle Breathing, Blinking & Real-Time Audio Lip-Sync
       const voiceEnergy = getLiveVoiceEnergy();
       const blink = Math.sin(t * 1.9) > 0.985 ? 0.12 : 1.0;
 
       animatedCharacters.forEach((rig) => {
         rig.leftEye.scale.y = blink;
         rig.rightEye.scale.y = blink;
-        if (rig.speaking) {
-          rig.mouthPivot.scale.y = 0.6 + voiceEnergy * 3.2;
-        }
+        if (rig.speaking) rig.mouthPivot.scale.y = 0.6 + voiceEnergy * 3.2;
       });
-
-      secondaryAnimators.forEach((fn) => { try { fn(t, progress); } catch (e) {} });
 
       if (typeof window.animateScene === "function") {
         try { window.animateScene(t, progress); } catch (e) {}
@@ -606,11 +514,13 @@
       if (uiProgress) uiProgress.style.width = Math.floor(progress * 100) + "%";
       if (uiTimer) uiTimer.textContent = Math.max(0, Math.ceil((DURATION - elapsed) / 1000)) + "s";
 
-      if (progress < 1) {
-        requestAnimationFrame(renderLoop);
-      } else if (recorder && recorder.state !== "inactive") {
-        recorder.stop();
+      if (progress >= 1 && !recordingStopped) {
+        recordingStopped = true;
+        if (recorder && recorder.state !== "inactive") recorder.stop();
       }
+
+      // Keep rendering smoothly so live preview never freezes or goes blank
+      requestAnimationFrame(renderLoop);
     }
 
     requestAnimationFrame(renderLoop);
