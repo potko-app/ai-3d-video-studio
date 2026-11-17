@@ -127,7 +127,6 @@
 
     if (customLights > 0) { keyLight.intensity = 0.6; hemiLight.intensity = 0.4; }
 
-    // Dynamic Cinematic Framing (If AI didn't animate)
     if (!hasCustomAnimation && meshCount > 0 && !worldBox.isEmpty()) {
       const center = worldBox.getCenter(new THREE.Vector3());
       const size = worldBox.getSize(new THREE.Vector3()).length();
@@ -142,7 +141,7 @@
   }
 
   // ============================================================================
-  // 4. STUDIO TOOLKIT (Exposed to AI for building characters/shapes)
+  // 4. STUDIO TOOLKIT (Robust & AI-Proof)
   // ============================================================================
   const animatedCharacters = [];
   const Studio = {
@@ -174,30 +173,58 @@
       p.position.set(opts.x || 0, opts.y || 0, opts.z || 0.52);
       target.add(p);
     },
+    lathe(profilePoints, segments = 48, material = null) {
+      const pts = profilePoints.map(([x, y]) => new THREE.Vector2(x, y));
+      const geo = new THREE.LatheGeometry(pts, segments);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, material || Studio.paint(0x6366f1, "glossy"));
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    },
     character(opts = {}) {
       const root = new THREE.Group();
       const bodyGroup = new THREE.Group();
       root.add(bodyGroup);
       const mat = Studio.paint(opts.color || 0x3b82f6, opts.finish || "glossy");
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.4, 8, 16), mat);
-      body.position.y = 0.65; body.castShadow = true;
+      
+      let body;
+      // Handle different shapes safely
+      if (opts.shape === "cup") {
+        body = Studio.lathe([[0, 0], [0.4, 0], [0.5, 0.9], [0.4, 0.9], [0.3, 0.1], [0, 0.1]], 32, mat);
+        const handle = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 16, 32, Math.PI), mat);
+        handle.position.set(0.45, 0.5, 0); handle.rotation.z = -Math.PI / 2;
+        bodyGroup.add(handle);
+      } else if (opts.shape === "biscuit" || opts.shape === "disc") {
+        body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32), mat);
+        body.rotation.x = Math.PI / 2; body.position.y = 0.5;
+      } else {
+        // Default capsule shape
+        body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.4, 8, 16), mat);
+        body.position.y = 0.65;
+      }
+      body.castShadow = true;
       bodyGroup.add(body);
 
       const ew = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const pw = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      // Adjust eye positions based on shape
+      const eyeY = opts.shape === "biscuit" || opts.shape === "disc" ? 0.5 : (opts.shape === "cup" ? 0.6 : 0.8);
+      const eyeZ = opts.shape === "biscuit" || opts.shape === "disc" ? 0.1 : (opts.shape === "cup" ? 0.5 : 0.4);
+      
       const le = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), ew);
-      le.position.set(-0.18, 0.8, 0.4);
+      le.position.set(-0.18, eyeY, eyeZ);
       const re = le.clone(); re.position.x = 0.18;
       const lp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), pw);
       lp.position.z = 0.1; le.add(lp); re.add(lp.clone());
       bodyGroup.add(le, re);
 
       const mouthPivot = new THREE.Group();
-      mouthPivot.position.set(0, 0.55, 0.45);
+      mouthPivot.position.set(0, eyeY - 0.25, eyeZ + 0.05);
       mouthPivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0x111111 })));
       bodyGroup.add(mouthPivot);
 
-      if (opts.name) Studio.label(bodyGroup, opts.name, { w: 0.8, h: 0.25, y: 0.25, z: 0.48, bg: "rgba(0,0,0,0.7)" });
+      if (opts.name) Studio.label(bodyGroup, opts.name, { w: 0.8, h: 0.25, y: eyeY - 0.5, z: eyeZ + 0.08, bg: "rgba(0,0,0,0.7)" });
 
       const rig = {
         root, leftEye: le, rightEye: re, mouthPivot,
@@ -226,7 +253,7 @@
       const v = (voiceTimeData[i] - 128) / 128;
       sum += v * v;
     }
-    return Math.min(1, Math.sqrt(sum / voiceTimeData.length) * 8.5); // Boosted RMS sensitivity for lip-sync
+    return Math.min(1, Math.sqrt(sum / voiceTimeData.length) * 8.5); 
   }
 
   function createPowerfulVoiceBus(ctx, dest) {
@@ -360,7 +387,7 @@
         const badge = document.getElementById("uiBadge");
         if (badge) { badge.textContent = "READY"; badge.classList.add("ready"); }
       };
-      recorder.start(250); // Important for Android WebView
+      recorder.start(250); 
     } catch(e){}
 
     const startT = performance.now();
