@@ -2,7 +2,7 @@
   "use strict";
 
   // ============================================================================
-  // 1. UNIVERSAL THREE.JS COMPATIBILITY LAYER (Prevents AI Code Crashes)
+  // 1. UNIVERSAL THREE.JS COMPATIBILITY LAYER (Prevents AI Crashes)
   // ============================================================================
   if (typeof THREE !== "undefined") {
     if (!THREE.CapsuleGeometry) {
@@ -25,7 +25,7 @@
   }
 
   // ============================================================================
-  // 2. PAYLOAD DECODER
+  // 2. SAFE PAYLOAD DECODER
   // ============================================================================
   function decodePayload(raw) {
     let clean = raw.trim();
@@ -39,16 +39,23 @@
   }
 
   let sceneData = { title: "Kinetra3D Cinema", narration: "", atmosphere: "studio_clean", code: "" };
+  let payloadError = false;
+
   try {
     const idx = window.location.href.indexOf("#scene=");
     if (idx !== -1) {
       const parsed = decodePayload(window.location.href.slice(idx + 7));
       if (parsed) sceneData = { ...sceneData, ...parsed };
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error("Payload decode error:", err);
+    payloadError = true;
+    sceneData.title = "URL Error / Code Too Long";
+  }
 
   const uiTitle = document.getElementById("uiTitle");
   if (uiTitle) uiTitle.textContent = sceneData.title || "Kinetra3D Studio";
+  const uiStatus = document.getElementById("uiStatus");
 
   // ============================================================================
   // 3. CORE RENDERING ENGINE & AUTO-CAMERA FRAMING
@@ -60,7 +67,9 @@
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputEncoding = THREE.sRGBEncoding;
-  document.getElementById("previewContainer").insertBefore(renderer.domElement, document.getElementById("previewContainer").firstChild);
+  
+  const previewContainer = document.getElementById("previewContainer");
+  if (previewContainer) previewContainer.insertBefore(renderer.domElement, previewContainer.firstChild);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(44, 16 / 9, 0.1, 300);
@@ -86,29 +95,28 @@
   studioRig.add(hemiLight, keyLight, rimLight);
   scene.add(studioRig);
 
+  // 🔴 POWERFUL CODE WASHER (Strips Markdown, Imports, and Bad Instantiations)
   function sanitizeAICode(rawCode) {
-    return rawCode
-      .replace(/(?:const|let|var)\s+scene\s*=\s*new\s+THREE\.Scene\s*\([^)]*\)\s*;?/g, "")
-      .replace(/(?:const|let|var)\s+camera\s*=\s*new\s+THREE\.PerspectiveCamera\s*\([^)]*\)\s*;?/g, "")
-      .replace(/(?:const|let|var)\s+renderer\s*=\s*new\s+THREE\.WebGLRenderer\s*\([^)]*\)\s*;?/g, "")
-      .replace(/document\.body\.appendChild\s*\(\s*renderer\.domElement\s*\)\s*;?/g, "")
-      .replace(/requestAnimationFrame\s*\([^)]*\)\s*;?/g, "");
+    if (typeof rawCode !== "string") return "";
+    let c = rawCode;
+    // Strip Markdown code blocks (```javascript, ```js, etc.)
+    c = c.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "");
+    // Strip ES6 imports
+    c = c.replace(/import\s+.*?from\s+['"].*?['"]\s*;?/g, "");
+    // Strip redefining of core variables
+    c = c.replace(/(?:const|let|var)\s+scene\s*=\s*new\s+THREE\.Scene\s*\([^)]*\)\s*;?/g, "");
+    c = c.replace(/(?:const|let|var)\s+camera\s*=\s*new\s+THREE\.PerspectiveCamera\s*\([^)]*\)\s*;?/g, "");
+    c = c.replace(/(?:const|let|var)\s+renderer\s*=\s*new\s+THREE\.WebGLRenderer\s*\([^)]*\)\s*;?/g, "");
+    c = c.replace(/document\.body\.appendChild\s*\([^)]*\)\s*;?/g, "");
+    return c.trim();
   }
 
   function calibrateSceneAndCamera(hasCustomAnimation) {
-    let customLights = 0;
-    let meshCount = 0;
+    let customLights = 0, meshCount = 0;
     const worldBox = new THREE.Box3();
 
-    if (scene.background && scene.background.isColor && (0.2126 * scene.background.r + 0.7152 * scene.background.g + 0.0722 * scene.background.b > 0.5)) {
-      scene.background.setHex(theme.bg);
-    }
-
     scene.traverse((node) => {
-      if (node.isLight && node.parent !== studioRig) {
-        customLights++;
-        if (node.intensity > 1.4) node.intensity = 1.25;
-      }
+      if (node.isLight && node.parent !== studioRig) { customLights++; if (node.intensity > 1.4) node.intensity = 1.25; }
       if (node.isMesh) {
         meshCount++;
         worldBox.expandByObject(node);
@@ -116,10 +124,7 @@
           const mats = Array.isArray(node.material) ? node.material : [node.material];
           mats.forEach(m => {
             if (m.color && (0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b > 0.84)) m.color.multiplyScalar(0.8);
-            if (m.isMeshBasicMaterial && !m.map) {
-              const shaded = new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.45, metalness: 0.1 });
-              node.material = shaded;
-            }
+            if (m.isMeshBasicMaterial && !m.map) node.material = new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.45, metalness: 0.1 });
           });
         }
       }
@@ -145,6 +150,7 @@
   // ============================================================================
   const animatedCharacters = [];
   const Studio = {
+    Math: { clamp: (v, m, M) => Math.max(m, Math.min(M, v)), lerp: (a, b, t) => a + (b - a) * t },
     paint: (cHex, finish = "standard") => {
       const c = new THREE.Color(cHex);
       if (finish === "glossy") return new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1 });
@@ -157,16 +163,13 @@
       cvs.width = opts.width || 512; cvs.height = opts.height || 256;
       const ctx = cvs.getContext("2d");
       ctx.fillStyle = opts.bg || "#1e293b"; ctx.fillRect(0, 0, cvs.width, cvs.height);
-      ctx.fillStyle = opts.color || "#ffffff";
-      ctx.font = `bold ${opts.fontSize || 48}px sans-serif`;
+      ctx.fillStyle = opts.color || "#ffffff"; ctx.font = `bold ${opts.fontSize || 48}px sans-serif`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const lines = String(text).split("\n");
       const lh = (opts.fontSize || 48) * 1.25;
       const startY = cvs.height / 2 - ((lines.length - 1) * lh) / 2;
       lines.forEach((line, i) => ctx.fillText(line, cvs.width / 2, startY + i * lh));
-      const tex = new THREE.CanvasTexture(cvs);
-      tex.encoding = THREE.sRGBEncoding;
-      return tex;
+      const tex = new THREE.CanvasTexture(cvs); tex.encoding = THREE.sRGBEncoding; return tex;
     },
     label: (target, text, opts = {}) => {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(opts.w || 1.2, opts.h || 0.5), new THREE.MeshBasicMaterial({ map: Studio.createTextTexture(text, opts), transparent: true }));
@@ -175,47 +178,38 @@
     },
     lathe(profilePoints, segments = 48, material = null) {
       const pts = profilePoints.map(([x, y]) => new THREE.Vector2(x, y));
-      const geo = new THREE.LatheGeometry(pts, segments);
-      geo.computeVertexNormals();
+      const geo = new THREE.LatheGeometry(pts, segments); geo.computeVertexNormals();
       const mesh = new THREE.Mesh(geo, material || Studio.paint(0x6366f1, "glossy"));
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      return mesh;
+      mesh.castShadow = true; mesh.receiveShadow = true; return mesh;
     },
     character(opts = {}) {
-      const root = new THREE.Group();
-      const bodyGroup = new THREE.Group();
-      root.add(bodyGroup);
+      const root = new THREE.Group(); const bodyGroup = new THREE.Group(); root.add(bodyGroup);
       const mat = Studio.paint(opts.color || 0x3b82f6, opts.finish || "glossy");
       
       let body;
-      // Handle different shapes safely
       if (opts.shape === "cup") {
         body = Studio.lathe([[0, 0], [0.4, 0], [0.5, 0.9], [0.4, 0.9], [0.3, 0.1], [0, 0.1]], 32, mat);
         const handle = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 16, 32, Math.PI), mat);
-        handle.position.set(0.45, 0.5, 0); handle.rotation.z = -Math.PI / 2;
-        bodyGroup.add(handle);
+        handle.position.set(0.45, 0.5, 0); handle.rotation.z = -Math.PI / 2; bodyGroup.add(handle);
       } else if (opts.shape === "biscuit" || opts.shape === "disc") {
         body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32), mat);
         body.rotation.x = Math.PI / 2; body.position.y = 0.5;
+      } else if (opts.shape === "sphere") {
+        body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), mat);
+        body.position.y = 0.55;
       } else {
-        // Default capsule shape
         body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.4, 8, 16), mat);
         body.position.y = 0.65;
       }
-      body.castShadow = true;
-      bodyGroup.add(body);
+      body.castShadow = true; bodyGroup.add(body);
 
-      const ew = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const pw = new THREE.MeshBasicMaterial({ color: 0x000000 });
-      // Adjust eye positions based on shape
-      const eyeY = opts.shape === "biscuit" || opts.shape === "disc" ? 0.5 : (opts.shape === "cup" ? 0.6 : 0.8);
-      const eyeZ = opts.shape === "biscuit" || opts.shape === "disc" ? 0.1 : (opts.shape === "cup" ? 0.5 : 0.4);
+      const eyeY = (opts.shape === "biscuit" || opts.shape === "disc" || opts.shape === "sphere") ? 0.55 : (opts.shape === "cup" ? 0.6 : 0.8);
+      const eyeZ = (opts.shape === "biscuit" || opts.shape === "disc") ? 0.1 : (opts.shape === "cup" ? 0.5 : 0.4);
       
-      const le = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), ew);
+      const le = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
       le.position.set(-0.18, eyeY, eyeZ);
       const re = le.clone(); re.position.x = 0.18;
-      const lp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), pw);
+      const lp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), new THREE.MeshBasicMaterial({ color: 0x000000 }));
       lp.position.z = 0.1; le.add(lp); re.add(lp.clone());
       bodyGroup.add(le, re);
 
@@ -224,17 +218,13 @@
       mouthPivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0x111111 })));
       bodyGroup.add(mouthPivot);
 
-      if (opts.name) Studio.label(bodyGroup, opts.name, { w: 0.8, h: 0.25, y: eyeY - 0.5, z: eyeZ + 0.08, bg: "rgba(0,0,0,0.7)" });
+      if (opts.name) Studio.label(bodyGroup, opts.name, { w: 0.8, h: 0.25, y: eyeY - 0.55, z: eyeZ + 0.08, bg: "rgba(0,0,0,0.7)" });
 
       const rig = {
-        root, leftEye: le, rightEye: re, mouthPivot,
-        speaking: opts.speaking !== false,
-        phase: Math.random() * Math.PI,
+        root, leftEye: le, rightEye: re, mouthPivot, speaking: opts.speaking !== false, phase: Math.random() * Math.PI,
         bounce: (t, speed = 4, height = 0.12) => { bodyGroup.position.y = Math.abs(Math.sin(t * speed + rig.phase)) * height; }
       };
-      animatedCharacters.push(rig);
-      scene.add(root);
-      return rig;
+      animatedCharacters.push(rig); scene.add(root); return rig;
     }
   };
   window.Studio = Studio;
@@ -242,48 +232,25 @@
   // ============================================================================
   // 5. MASTER VOICE & LIP-SYNC ENGINE
   // ============================================================================
-  let voiceAnalyser = null;
-  let voiceTimeData = null;
+  let voiceAnalyser = null; let voiceTimeData = null;
 
   function getLiveVoiceEnergy() {
     if (!voiceAnalyser || !voiceTimeData) return 0;
     voiceAnalyser.getByteTimeDomainData(voiceTimeData);
     let sum = 0;
-    for (let i = 0; i < voiceTimeData.length; i++) {
-      const v = (voiceTimeData[i] - 128) / 128;
-      sum += v * v;
-    }
+    for (let i = 0; i < voiceTimeData.length; i++) { const v = (voiceTimeData[i] - 128) / 128; sum += v * v; }
     return Math.min(1, Math.sqrt(sum / voiceTimeData.length) * 8.5); 
   }
 
   function createPowerfulVoiceBus(ctx, dest) {
-    const subPunch = ctx.createBiquadFilter();
-    subPunch.type = "lowshelf";
-    subPunch.frequency.value = 155;
-    subPunch.gain.value = 7.5; 
+    const subPunch = ctx.createBiquadFilter(); subPunch.type = "lowshelf"; subPunch.frequency.value = 155; subPunch.gain.value = 7.5; 
+    const presence = ctx.createBiquadFilter(); presence.type = "peaking"; presence.frequency.value = 2900; presence.Q.value = 1.0; presence.gain.value = 5.0; 
+    const compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -24; compressor.ratio.value = 5.0;
+    voiceAnalyser = ctx.createAnalyser(); voiceAnalyser.fftSize = 256; voiceTimeData = new Uint8Array(voiceAnalyser.frequencyBinCount);
+    const boostGain = ctx.createGain(); boostGain.gain.value = 2.5; 
 
-    const presence = ctx.createBiquadFilter();
-    presence.type = "peaking";
-    presence.frequency.value = 2900;
-    presence.Q.value = 1.0;
-    presence.gain.value = 5.0; 
-
-    const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.ratio.value = 5.0;
-
-    voiceAnalyser = ctx.createAnalyser();
-    voiceAnalyser.fftSize = 256;
-    voiceTimeData = new Uint8Array(voiceAnalyser.frequencyBinCount);
-
-    const boostGain = ctx.createGain();
-    boostGain.gain.value = 2.5; 
-
-    subPunch.connect(presence);
-    presence.connect(compressor);
-    compressor.connect(voiceAnalyser);
-    voiceAnalyser.connect(boostGain);
-    boostGain.connect(dest);
+    subPunch.connect(presence); presence.connect(compressor); compressor.connect(voiceAnalyser);
+    voiceAnalyser.connect(boostGain); boostGain.connect(dest);
     try { boostGain.connect(ctx.destination); } catch(e){}
     return subPunch;
   }
@@ -313,17 +280,26 @@
   // 6. RENDER LOOP & SAFE RECORDER
   // ============================================================================
   async function startEngine() {
-    if (sceneData.code && sceneData.code.trim().length > 20) {
+    if (uiStatus) uiStatus.textContent = "Building 3D World...";
+
+    let codeCrashed = false;
+    if (sceneData.code && sceneData.code.trim().length > 10 && !payloadError) {
       try {
-        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", sanitizeAICode(sceneData.code));
+        const safeCode = sanitizeAICode(sceneData.code);
+        const runSceneBuilder = new Function("scene", "camera", "renderer", "THREE", "Studio", safeCode);
         runSceneBuilder(scene, camera, renderer, THREE, Studio);
       } catch (err) {
         console.error("AI Scene Error:", err);
+        codeCrashed = true;
+        if (uiStatus) uiStatus.textContent = "Error in AI Code, Loading Fallback...";
       }
     }
+
     const meshCount = calibrateSceneAndCamera(typeof window.animateScene === "function");
-    if (meshCount === 0) {
-      const hero = Studio.character({ color: 0xf59e0b, name: sceneData.title || "KINETRA" });
+    
+    // 🔴 Fallback triggered if AI code crashed OR if it created 0 meshes
+    if (meshCount === 0 || codeCrashed || payloadError) {
+      const hero = Studio.character({ color: 0xf59e0b, name: payloadError ? "URL ERROR" : (sceneData.title || "KINETRA") });
       window.animateScene = (t, p) => { hero.bounce(t); camera.position.x = Math.sin(t) * 4; camera.lookAt(0,1,0); };
     }
 
@@ -336,7 +312,6 @@
       document.addEventListener("click", unlockAudio, { passive: true });
 
       audioDest = audioCtx.createMediaStreamDestination();
-      
       const padF = audioCtx.createBiquadFilter(); padF.type="lowpass"; padF.frequency.value = 180;
       const padG = audioCtx.createGain(); padG.gain.value = 0.012;
       padF.connect(padG); padG.connect(audioDest);
@@ -350,9 +325,7 @@
         if (clip) {
           const scheduleClip = () => {
             const src = audioCtx.createBufferSource();
-            src.buffer = clip;
-            src.connect(voiceBus);
-            src.start(audioCtx.currentTime + 0.1);
+            src.buffer = clip; src.connect(voiceBus); src.start(audioCtx.currentTime + 0.1);
           };
           if (audioCtx.state === "running") scheduleClip();
           else document.addEventListener("touchstart", () => audioCtx.resume().then(scheduleClip), { once: true });
@@ -392,6 +365,9 @@
 
     const startT = performance.now();
     let stopped = false;
+    
+    if (uiStatus && !codeCrashed && !payloadError) uiStatus.textContent = "Rendering 3D Video & Studio Voice...";
+
     function renderLoop(now) {
       const el = now - startT;
       const p = Math.min(1, el / DURATION);
